@@ -161,14 +161,11 @@
 
     db.ref("sensor/temperature").on("value", snap => temp.innerText = snap.val() !== null ? snap.val() : "-");
     db.ref("sensor/humidity").on("value", snap => humi.innerText = snap.val() !== null ? snap.val() : "-");
+    
+    // 토양습도 센서값 그대로 표시하도록 수정
     db.ref("sensor/moisture").on("value", snap => {
       let val = snap.val();
-      if(val !== null) {
-        let percent = Math.round((1023 - val) / 10.23);
-        soil.innerText = percent + "%";
-      } else {
-        soil.innerText = "-";
-      }
+      soil.innerText = val !== null ? val : "-";
     });
 
     const pumpRef = db.ref("PUMP/STATE");
