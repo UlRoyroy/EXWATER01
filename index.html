@@ -75,17 +75,10 @@
 <div id="dashboard" style="display:none">
   <div class="status-card">
     <h2>환경 정보</h2>
-    <p>시간: <span id="time">-</span></p>
-    <p>온도: <span id="temp">-</span>℃</p>
-    <p>습도: <span id="humi">-</span>%</p>
-    <p>토양습도: <span id="soil">-</span>%</p>
+    <p>온도: <span id="temp">-</span> ℃</p>
+    <p>습도: <span id="humi">-</span> %</p>
+    <p>토양습도: <span id="soil">-</span></p>
     <p>펌프 상태: <span id="pumpStatus">-</span></p>
-    <p>모드: 
-      <select id="mode">
-        <option value="auto">자동</option>
-        <option value="manual">수동</option>
-      </select>
-    </p>
     <button id="togglePump" disabled>펌프 ON/OFF</button>
   </div>
   <button id="logoutBtn">로그아웃</button>
@@ -128,37 +121,51 @@
   };
 
   function startMonitoring() {
-    const time = document.getElementById("time");
     const temp = document.getElementById("temp");
     const humi = document.getElementById("humi");
     const soil = document.getElementById("soil");
     const pumpStatus = document.getElementById("pumpStatus");
     const toggleBtn = document.getElementById("togglePump");
-    const modeSel = document.getElementById("mode");
 
-    db.ref("time").on("value", snap => time.innerText = snap.val() || "-");
-    db.ref("temperature").on("value", snap => temp.innerText = snap.val());
-    db.ref("humidity").on("value", snap => humi.innerText = snap.val());
-    db.ref("soil").on("value", snap => soil.innerText = snap.val());
-
-    const modeRef = db.ref("mode");
-    const pumpRef = db.ref("pump");
-
-    modeRef.on("value", snap => {
-      modeSel.value = snap.val();
-      toggleBtn.disabled = snap.val() !== "manual";
+    // 센서 데이터 경로는 ESP와 맞춰서 /sensor/ 사용
+    db.ref("sensor/temperature").on("value", snap => temp.innerText = snap.val() !== null ? snap.val() : "-");
+    db.ref("sensor/humidity").on("value", snap => humi.innerText = snap.val() !== null ? snap.val() : "-");
+    db.ref("sensor/moisture").on("value", snap => {
+      let val = snap.val();
+      if(val !== null) {
+        // 아날로그값 0~1023 기준을 %로 변환 (대략적인 변환)
+        let percent = Math.round((1023 - val) / 10.23);
+        soil.innerText = percent + "%";
+      } else {
+        soil.innerText = "-";
+      }
     });
 
+    // 펌프 상태 경로도 ESP쪽과 맞춤 (/PUMP/STATE)
+    const pumpRef = db.ref("PUMP/STATE");
     pumpRef.on("value", snap => {
       const val = snap.val();
-      pumpStatus.innerText = val ? "작동 중" : "정지";
-      toggleBtn.style.backgroundColor = val ? "green" : "blue";
+      if (val === true) {
+        pumpStatus.innerText = "작동 중";
+        toggleBtn.style.backgroundColor = "green";
+        toggleBtn.innerText = "펌프 끄기";
+        toggleBtn.disabled = false;
+      } else if (val === false) {
+        pumpStatus.innerText = "정지";
+        toggleBtn.style.backgroundColor = "blue";
+        toggleBtn.innerText = "펌프 켜기";
+        toggleBtn.disabled = false;
+      } else {
+        pumpStatus.innerText = "-";
+        toggleBtn.disabled = true;
+      }
     });
 
-    modeSel.onchange = () => modeRef.set(modeSel.value);
-
     toggleBtn.onclick = () => {
-      pumpRef.get().then(snap => pumpRef.set(!snap.val()));
+      pumpRef.get().then(snap => {
+        let current = snap.val();
+        pumpRef.set(!current);
+      });
     };
   }
 
