@@ -15,6 +15,11 @@
     h1 {
       margin-top: 30px;
     }
+    #currentTime {
+      font-size: 1.1rem;
+      color: #333;
+      margin-bottom: 20px;
+    }
     .status-card {
       display: inline-block;
       background-color: white;
@@ -30,7 +35,7 @@
     .status-card p {
       margin: 8px 0;
     }
-    .status-card button, .status-card select {
+    .status-card button, select {
       padding: 10px;
       font-size: 16px;
       margin-top: 10px;
@@ -65,6 +70,7 @@
 <body>
 
 <h1>EXWATER 관수 시스템</h1>
+<p id="currentTime">현재 시각 (KST): -</p>
 
 <div id="loginForm">
   <input type="email" id="email" placeholder="이메일" required><br>
@@ -79,10 +85,12 @@
     <p>습도: <span id="humi">-</span> %</p>
     <p>토양습도: <span id="soil">-</span></p>
     <p>펌프 상태: <span id="pumpStatus">-</span></p>
-    <select id="modeSelect">
-      <option value="auto">자동 모드</option>
-      <option value="manual">수동 모드</option>
-    </select>
+    <p>모드: 
+      <select id="modeSelect">
+        <option value="auto">자동</option>
+        <option value="manual">수동</option>
+      </select>
+    </p>
     <button id="togglePump" disabled>펌프 ON/OFF</button>
   </div>
   <button id="logoutBtn">로그아웃</button>
@@ -92,11 +100,9 @@
   © 2025 EXWATER 스마트 관수 시스템
 </footer>
 
-<!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
-
 <script>
   const firebaseConfig = {
     apiKey: "AIzaSyBiL0ye_VT5UKozsKwdt__orQQw6VCARm8",
@@ -125,6 +131,15 @@
     }
   };
 
+  function updateTime() {
+    const now = new Date();
+    const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+    const formatted = kst.toISOString().replace("T", " ").substring(0, 19);
+    document.getElementById("currentTime").innerText = "현재 시각 (KST): " + formatted;
+  }
+  setInterval(updateTime, 1000);
+  updateTime();
+
   function startMonitoring() {
     const temp = document.getElementById("temp");
     const humi = document.getElementById("humi");
@@ -133,8 +148,9 @@
     const toggleBtn = document.getElementById("togglePump");
     const modeSelect = document.getElementById("modeSelect");
 
-    db.ref("sensor/temperature").on("value", snap => temp.innerText = snap.val() ?? "-");
-    db.ref("sensor/humidity").on("value", snap => humi.innerText = snap.val() ?? "-");
+    // 센서 데이터
+    db.ref("sensor/temperature").on("value", snap => temp.innerText = snap.val() !== null ? snap.val() : "-");
+    db.ref("sensor/humidity").on("value", snap => humi.innerText = snap.val() !== null ? snap.val() : "-");
     db.ref("sensor/moisture").on("value", snap => {
       let val = snap.val();
       if(val !== null) {
@@ -146,56 +162,42 @@
     });
 
     const pumpRef = db.ref("PUMP/STATE");
-    const modeRef = db.ref("PUMP/MODE");
-
-    // 모드 감지
-    modeRef.on("value", snap => {
-      const mode = snap.val();
-      if (mode === "auto") {
-        toggleBtn.disabled = true;
-        modeSelect.value = "auto";
-        toggleBtn.innerText = "자동 제어 중";
-        toggleBtn.style.backgroundColor = "#ccc";
-      } else if (mode === "manual") {
+    pumpRef.on("value", snap => {
+      const val = snap.val();
+      if (val === true) {
+        pumpStatus.innerText = "작동 중";
+        toggleBtn.style.backgroundColor = "green";
+        toggleBtn.innerText = "펌프 끄기";
         toggleBtn.disabled = false;
-        modeSelect.value = "manual";
+      } else if (val === false) {
+        pumpStatus.innerText = "정지";
+        toggleBtn.style.backgroundColor = "blue";
+        toggleBtn.innerText = "펌프 켜기";
+        toggleBtn.disabled = false;
+      } else {
+        pumpStatus.innerText = "-";
+        toggleBtn.disabled = true;
       }
     });
 
-    // 수동일 때만 펌프 상태에 따라 버튼 표시
-    pumpRef.on("value", snap => {
-      const val = snap.val();
-      modeRef.get().then(modeSnap => {
-        const mode = modeSnap.val();
-        if (mode === "manual") {
-          if (val === true) {
-            pumpStatus.innerText = "작동 중";
-            toggleBtn.innerText = "펌프 끄기";
-            toggleBtn.style.backgroundColor = "green";
-          } else {
-            pumpStatus.innerText = "정지";
-            toggleBtn.innerText = "펌프 켜기";
-            toggleBtn.style.backgroundColor = "blue";
-          }
-        } else {
-          pumpStatus.innerText = val === true ? "작동 중 (자동)" : "정지 (자동)";
-        }
-      });
+    // 모드 변경
+    const modeRef = db.ref("PUMP/MODE");
+    modeRef.on("value", snap => {
+      if (snap.exists()) {
+        modeSelect.value = snap.val();
+        toggleBtn.disabled = snap.val() === "auto"; // 자동일 땐 제어 비활성화
+      }
     });
 
-    toggleBtn.onclick = () => {
-      modeRef.get().then(modeSnap => {
-        if (modeSnap.val() === "manual") {
-          pumpRef.get().then(snap => {
-            pumpRef.set(!snap.val());
-          });
-        }
-      });
+    modeSelect.onchange = () => {
+      modeRef.set(modeSelect.value);
     };
 
-    modeSelect.onchange = () => {
-      const newMode = modeSelect.value;
-      modeRef.set(newMode);
+    toggleBtn.onclick = () => {
+      pumpRef.get().then(snap => {
+        const current = snap.val();
+        pumpRef.set(!current);
+      });
     };
   }
 
