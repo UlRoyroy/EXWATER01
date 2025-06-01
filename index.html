@@ -30,7 +30,7 @@
     .status-card p {
       margin: 8px 0;
     }
-    .status-card button, select {
+    .status-card button, .status-card select {
       padding: 10px;
       font-size: 16px;
       margin-top: 10px;
@@ -79,6 +79,10 @@
     <p>습도: <span id="humi">-</span> %</p>
     <p>토양습도: <span id="soil">-</span></p>
     <p>펌프 상태: <span id="pumpStatus">-</span></p>
+    <select id="modeSelect">
+      <option value="auto">자동 모드</option>
+      <option value="manual">수동 모드</option>
+    </select>
     <button id="togglePump" disabled>펌프 ON/OFF</button>
   </div>
   <button id="logoutBtn">로그아웃</button>
@@ -88,9 +92,11 @@
   © 2025 EXWATER 스마트 관수 시스템
 </footer>
 
+<!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
+
 <script>
   const firebaseConfig = {
     apiKey: "AIzaSyBiL0ye_VT5UKozsKwdt__orQQw6VCARm8",
@@ -102,7 +108,6 @@
     appId: "1:166996899021:web:5bd2acc8592026ab5b6584"
   };
   firebase.initializeApp(firebaseConfig);
-
   const db = firebase.database();
 
   const loginBtn = document.getElementById("loginBtn");
@@ -126,14 +131,13 @@
     const soil = document.getElementById("soil");
     const pumpStatus = document.getElementById("pumpStatus");
     const toggleBtn = document.getElementById("togglePump");
+    const modeSelect = document.getElementById("modeSelect");
 
-    // 센서 데이터 경로는 ESP와 맞춰서 /sensor/ 사용
-    db.ref("sensor/temperature").on("value", snap => temp.innerText = snap.val() !== null ? snap.val() : "-");
-    db.ref("sensor/humidity").on("value", snap => humi.innerText = snap.val() !== null ? snap.val() : "-");
+    db.ref("sensor/temperature").on("value", snap => temp.innerText = snap.val() ?? "-");
+    db.ref("sensor/humidity").on("value", snap => humi.innerText = snap.val() ?? "-");
     db.ref("sensor/moisture").on("value", snap => {
       let val = snap.val();
       if(val !== null) {
-        // 아날로그값 0~1023 기준을 %로 변환 (대략적인 변환)
         let percent = Math.round((1023 - val) / 10.23);
         soil.innerText = percent + "%";
       } else {
@@ -141,31 +145,57 @@
       }
     });
 
-    // 펌프 상태 경로도 ESP쪽과 맞춤 (/PUMP/STATE)
     const pumpRef = db.ref("PUMP/STATE");
-    pumpRef.on("value", snap => {
-      const val = snap.val();
-      if (val === true) {
-        pumpStatus.innerText = "작동 중";
-        toggleBtn.style.backgroundColor = "green";
-        toggleBtn.innerText = "펌프 끄기";
-        toggleBtn.disabled = false;
-      } else if (val === false) {
-        pumpStatus.innerText = "정지";
-        toggleBtn.style.backgroundColor = "blue";
-        toggleBtn.innerText = "펌프 켜기";
-        toggleBtn.disabled = false;
-      } else {
-        pumpStatus.innerText = "-";
+    const modeRef = db.ref("PUMP/MODE");
+
+    // 모드 감지
+    modeRef.on("value", snap => {
+      const mode = snap.val();
+      if (mode === "auto") {
         toggleBtn.disabled = true;
+        modeSelect.value = "auto";
+        toggleBtn.innerText = "자동 제어 중";
+        toggleBtn.style.backgroundColor = "#ccc";
+      } else if (mode === "manual") {
+        toggleBtn.disabled = false;
+        modeSelect.value = "manual";
       }
     });
 
-    toggleBtn.onclick = () => {
-      pumpRef.get().then(snap => {
-        let current = snap.val();
-        pumpRef.set(!current);
+    // 수동일 때만 펌프 상태에 따라 버튼 표시
+    pumpRef.on("value", snap => {
+      const val = snap.val();
+      modeRef.get().then(modeSnap => {
+        const mode = modeSnap.val();
+        if (mode === "manual") {
+          if (val === true) {
+            pumpStatus.innerText = "작동 중";
+            toggleBtn.innerText = "펌프 끄기";
+            toggleBtn.style.backgroundColor = "green";
+          } else {
+            pumpStatus.innerText = "정지";
+            toggleBtn.innerText = "펌프 켜기";
+            toggleBtn.style.backgroundColor = "blue";
+          }
+        } else {
+          pumpStatus.innerText = val === true ? "작동 중 (자동)" : "정지 (자동)";
+        }
       });
+    });
+
+    toggleBtn.onclick = () => {
+      modeRef.get().then(modeSnap => {
+        if (modeSnap.val() === "manual") {
+          pumpRef.get().then(snap => {
+            pumpRef.set(!snap.val());
+          });
+        }
+      });
+    };
+
+    modeSelect.onchange = () => {
+      const newMode = modeSelect.value;
+      modeRef.set(newMode);
     };
   }
 
