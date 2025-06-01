@@ -1,1 +1,24 @@
+# Arduino 프로젝트에서 제외할 파일들
+
+# 개인 비밀 설정
 secrets.h
+
+# 빌드 관련 임시 파일
+*.elf
+*.hex
+*.bin
+*.eep
+*.map
+*.d
+*.o
+
+# VSCode 또는 Arduino IDE 관련 설정
+.vscode/
+*.code-workspace
+
+# macOS, Windows 시스템 파일
+.DS_Store
+Thumbs.db
+
+# 기타 사용자 정의 무시 파일
+my_config.json
