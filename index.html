@@ -140,6 +140,17 @@
   setInterval(updateTime, 1000);
   updateTime();
 
+  function getKSTTimeString() {
+    const now = new Date();
+    const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+    return kst.toISOString().replace("T", " ").substring(0, 19);
+  }
+
+  function logPumpChange(newState) {
+    const logText = getKSTTimeString() + (newState ? " - 펌프 ON" : " - 펌프 OFF");
+    db.ref("PUMP/LOGS").push(logText);
+  }
+
   function startMonitoring() {
     const temp = document.getElementById("temp");
     const humi = document.getElementById("humi");
@@ -148,7 +159,6 @@
     const toggleBtn = document.getElementById("togglePump");
     const modeSelect = document.getElementById("modeSelect");
 
-    // 센서 데이터
     db.ref("sensor/temperature").on("value", snap => temp.innerText = snap.val() !== null ? snap.val() : "-");
     db.ref("sensor/humidity").on("value", snap => humi.innerText = snap.val() !== null ? snap.val() : "-");
     db.ref("sensor/moisture").on("value", snap => {
@@ -162,30 +172,31 @@
     });
 
     const pumpRef = db.ref("PUMP/STATE");
+    let lastPumpState = null;
     pumpRef.on("value", snap => {
       const val = snap.val();
-      if (val === true) {
-        pumpStatus.innerText = "작동 중";
-        toggleBtn.style.backgroundColor = "green";
-        toggleBtn.innerText = "펌프 끄기";
+      if (val !== null) {
+        pumpStatus.innerText = val ? "작동 중" : "정지";
+        toggleBtn.style.backgroundColor = val ? "green" : "blue";
+        toggleBtn.innerText = val ? "펌프 끄기" : "펌프 켜기";
         toggleBtn.disabled = false;
-      } else if (val === false) {
-        pumpStatus.innerText = "정지";
-        toggleBtn.style.backgroundColor = "blue";
-        toggleBtn.innerText = "펌프 켜기";
-        toggleBtn.disabled = false;
+
+        if (lastPumpState !== null && val !== lastPumpState) {
+          logPumpChange(val);
+        }
+        lastPumpState = val;
       } else {
         pumpStatus.innerText = "-";
         toggleBtn.disabled = true;
       }
     });
 
-    // 모드 변경
     const modeRef = db.ref("PUMP/MODE");
     modeRef.on("value", snap => {
       if (snap.exists()) {
-        modeSelect.value = snap.val();
-        toggleBtn.disabled = snap.val() === "auto"; // 자동일 땐 제어 비활성화
+        const mode = snap.val();
+        modeSelect.value = mode;
+        toggleBtn.disabled = (mode === "auto");
       }
     });
 
@@ -197,6 +208,7 @@
       pumpRef.get().then(snap => {
         const current = snap.val();
         pumpRef.set(!current);
+        // 로그는 pumpRef.on()에서 자동 처리됨
       });
     };
   }
