@@ -8,7 +8,6 @@
 #define WIFI_PASSWORD "YourPassword"
 
 // API Key
-#define API_KEY "AIzaSyDp34Lp0aJQN-k8eOkyKcvRuxrLJPSaHDE"
 
 // MQTT 또는 기타 비밀번호
 #define MQTT_USERNAME "yourMqttUser"
