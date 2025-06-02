@@ -101,6 +101,7 @@
   © 2025 EXWATER 스마트 관수 시스템
 </footer>
 
+<!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
@@ -114,7 +115,6 @@
     messagingSenderId: "166996899021",
     appId: "1:166996899021:web:c6ce758dc566dbc75b6584"
   };
-
   firebase.initializeApp(firebaseConfig);
   const db = firebase.database();
 
@@ -166,16 +166,15 @@
       logPumpChange(newState);
     }
 
-    // 실시간 리스너로 센서값 업데이트 (30초마다 자동 갱신됨)
+    // 센서 값 실시간 리스너
     db.ref("sensor").on("value", snap => {
-      if (!snap.exists()) return;
-      const data = snap.val();
-      temp.innerText = data.temperature !== undefined ? data.temperature : "-";
-      humi.innerText = data.humidity !== undefined ? data.humidity : "-";
-      soil.innerText = data.moisture !== undefined ? data.moisture : "-";
+      const data = snap.val() || {};
+      temp.innerText = data.temperature ?? "-";
+      humi.innerText = data.humidity ?? "-";
+      soil.innerText = data.moisture ?? "-";
     });
 
-    // 실시간 펌프 상태 & 모드 리스너
+    // 펌프 상태 리스너
     db.ref("PUMP/STATE").on("value", snap => {
       const val = snap.val();
       if (val !== null) {
@@ -191,13 +190,12 @@
       }
     });
 
+    // 모드 리스너
     db.ref("PUMP/MODE").on("value", snap => {
-      if (snap.exists()) {
-        const mode = snap.val();
-        if (mode !== modeSelect.value) {
-          modeSelect.value = mode;
-          updateUIByMode(mode);
-        }
+      const mode = snap.val();
+      if (mode && mode !== modeSelect.value) {
+        modeSelect.value = mode;
+        updateUIByMode(mode);
       }
     });
 
@@ -211,12 +209,9 @@
       }
     }
 
-    // 수동 모드 자동 전환 타이머 (3분 ON, 1분 OFF)
+    // 수동모드 자동 복귀 타이머
     function startAutoSwitchTimer(isPumpOn) {
-      if (autoSwitchTimeout) {
-        clearTimeout(autoSwitchTimeout);
-        autoSwitchTimeout = null;
-      }
+      if (autoSwitchTimeout) clearTimeout(autoSwitchTimeout);
       const delay = isPumpOn ? 3 * 60 * 1000 : 1 * 60 * 1000;
       autoSwitchTimeout = setTimeout(() => {
         db.ref("PUMP/MODE").set("auto");
@@ -224,12 +219,11 @@
     }
 
     modeSelect.onchange = () => {
-      const selectedMode = modeSelect.value;
-      db.ref("PUMP/MODE").set(selectedMode);
-      updateUIByMode(selectedMode);
-      if (selectedMode === "manual" && autoSwitchTimeout) {
+      const selected = modeSelect.value;
+      db.ref("PUMP/MODE").set(selected);
+      updateUIByMode(selected);
+      if (selected === "manual" && autoSwitchTimeout) {
         clearTimeout(autoSwitchTimeout);
-        autoSwitchTimeout = null;
       }
     };
 
