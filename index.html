@@ -47,9 +47,15 @@
       background-color: blue;
       color: white;
       border: none;
+      transition: background-color 0.3s ease;
     }
-    .status-card button:hover {
+    .status-card button:hover:not(:disabled) {
       opacity: 0.8;
+    }
+    .status-card button:disabled {
+      background-color: grey;
+      cursor: not-allowed;
+      opacity: 0.6;
     }
     #logoutBtn {
       margin-top: 30px;
@@ -94,7 +100,7 @@
         <option value="manual">수동</option>
       </select>
     </p>
-    <button id="togglePump" style="display:none;">펌프 ON/OFF</button>
+    <button id="togglePump" style="display:none;" disabled>펌프 ON/OFF</button>
   </div>
   <button id="logoutBtn">로그아웃</button>
 </div>
@@ -107,7 +113,9 @@
 <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
+
 <script>
+  // Firebase 초기화
   const firebaseConfig = {
     apiKey: "AIzaSyDir8gHZqsrExrIhF9nzBy4KbGINOuD2q8",
     authDomain: "exwater01.firebaseapp.com",
@@ -120,6 +128,7 @@
   firebase.initializeApp(firebaseConfig);
   const db = firebase.database();
 
+  // 현재 KST 시간 표시 (매초 갱신)
   function updateTime() {
     const now = new Date();
     const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
@@ -129,30 +138,36 @@
   setInterval(updateTime, 1000);
   updateTime();
 
+  // 익명 로그인 상태 관리 및 대시보드 표시
   firebase.auth().onAuthStateChanged(user => {
     if (user) {
       document.getElementById("dashboard").style.display = "block";
       document.getElementById("loginForm").style.display = "none";
       startMonitoring();
     } else {
+      // 익명 로그인 시도
       firebase.auth().signInAnonymously().catch(err => {
         alert("익명 로그인 실패: " + err.message);
       });
     }
   });
 
+  // KST 기준 현재 시각 문자열 (HH:MM:SS)
   function getKSTTimeString() {
     const now = new Date();
     const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-    return kst.toTimeString().substring(0, 8); // HH:MM:SS
+    return kst.toTimeString().substring(0, 8);
   }
 
+  // 펌프 상태 변경 시 메타 정보 업데이트 (시간, 작동 시간)
   function updatePumpMeta(newState) {
     const timeNow = getKSTTimeString();
     db.ref("PUMP/time").set(timeNow);
-    db.ref("PUMP/runtime").set(newState ? 180 : 0); // 예시: ON 시 180초, OFF 시 0초
+    // 작동 시간 예시: ON 시 180초, OFF 시 0초 (필요 시 변경)
+    db.ref("PUMP/runtime").set(newState ? 180 : 0);
   }
 
+  // 대시보드 데이터 실시간 모니터링 및 UI 제어 함수
   function startMonitoring() {
     const temp = document.getElementById("temp");
     const humi = document.getElementById("humi");
@@ -166,7 +181,7 @@
     let lastPumpState = null;
     let autoSwitchTimeout = null;
 
-    // 센서 정보
+    // 센서 데이터 실시간 수신
     db.ref("sensor").on("value", snap => {
       const data = snap.val() || {};
       temp.innerText = data.temperature ?? "-";
@@ -174,33 +189,42 @@
       soil.innerText = data.moisture ?? "-";
     });
 
-    // 펌프 상태
+    // 펌프 상태 실시간 수신 및 UI 업데이트
     db.ref("PUMP/STATE").on("value", snap => {
       const val = snap.val();
       if (val !== null) {
         pumpStatus.innerText = val ? "작동 중" : "정지";
+
+        // 상태가 변경됐을 때만 메타 업데이트 (중복 방지)
         if (val !== lastPumpState) {
           updatePumpMeta(val);
           lastPumpState = val;
         }
+
+        // 수동 모드일 때만 버튼 활성화 및 상태 반영
         if (modeSelect.value === "manual") {
+          toggleBtn.style.display = "inline-block";
+          toggleBtn.disabled = false;
           toggleBtn.style.backgroundColor = val ? "green" : "blue";
           toggleBtn.innerText = val ? "펌프 끄기" : "펌프 켜기";
+        } else {
+          toggleBtn.style.display = "none";
+          toggleBtn.disabled = true;
         }
       }
     });
 
-    // 마지막 시간
+    // 마지막 펌프 작동 시간 실시간 수신
     db.ref("PUMP/time").on("value", snap => {
       pumpTime.innerText = snap.val() || "-";
     });
 
-    // 작동 시간
+    // 펌프 작동 시간 실시간 수신
     db.ref("PUMP/runtime").on("value", snap => {
       pumpRuntime.innerText = snap.val() ?? "-";
     });
 
-    // 모드
+    // 모드 실시간 수신 및 UI 업데이트
     db.ref("PUMP/MODE").on("value", snap => {
       const mode = snap.val();
       if (mode && mode !== modeSelect.value) {
@@ -209,54 +233,47 @@
       }
     });
 
+    // 모드에 따른 UI 제어 함수
     function updateUIByMode(mode) {
       if (mode === "auto") {
         toggleBtn.style.display = "none";
         toggleBtn.disabled = true;
-      } else {
+      } else if (mode === "manual") {
         toggleBtn.style.display = "inline-block";
         toggleBtn.disabled = false;
       }
     }
 
-    // 수동 모드 타이머
-    function startAutoSwitchTimer(isPumpOn) {
-      if (autoSwitchTimeout) clearTimeout(autoSwitchTimeout);
-      const delay = isPumpOn ? 180000 : 60000;
-      autoSwitchTimeout = setTimeout(() => {
-        db.ref("PUMP/MODE").set("auto");
-      }, delay);
-    }
-
-    modeSelect.onchange = () => {
-      const selected = modeSelect.value;
-      db.ref("PUMP/MODE").set(selected);
-      updateUIByMode(selected);
-      if (selected === "manual" && autoSwitchTimeout) {
-        clearTimeout(autoSwitchTimeout);
-      }
-    };
-
+    // 수동 모드 ON/OFF 버튼 클릭 시 펌프 상태 토글 및 DB 업데이트
     toggleBtn.onclick = () => {
       db.ref("PUMP/STATE").get().then(snap => {
         const current = snap.val();
         const newState = !current;
         db.ref("PUMP/STATE").set(newState);
         updatePumpMeta(newState);
-        if (modeSelect.value === "manual") {
-          startAutoSwitchTimer(newState);
-        }
+      }).catch(err => {
+        alert("펌프 상태 가져오기 실패: " + err.message);
       });
     };
 
+    // 모드 변경 시 DB에 반영 및 UI 업데이트
+    modeSelect.onchange = () => {
+      const selected = modeSelect.value;
+      db.ref("PUMP/MODE").set(selected);
+      updateUIByMode(selected);
+    };
+
+    // 초기 UI 셋업
     updateUIByMode(modeSelect.value);
   }
 
+  // 로그아웃 버튼 클릭 시 Firebase 로그아웃 처리
   document.getElementById("logoutBtn").onclick = () => {
     firebase.auth().signOut().then(() => {
       document.getElementById("dashboard").style.display = "none";
     });
   };
 </script>
+
 </body>
 </html>
