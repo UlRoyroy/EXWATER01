@@ -72,7 +72,6 @@
 <h1>EXWATER 관수 시스템</h1>
 <p id="currentTime">현재 시각 (KST): -</p>
 
-<!-- 로그인 폼 제거 또는 숨김 -->
 <div id="loginForm" style="display:none">
   <input type="email" id="email" placeholder="이메일" required><br>
   <input type="password" id="password" placeholder="비밀번호" required><br>
@@ -110,12 +109,22 @@
     authDomain: "exwater01.firebaseapp.com",
     databaseURL: "https://exwater01-default-rtdb.asia-southeast1.firebasedatabase.app",
     projectId: "exwater01",
-    storageBucket: "exwater01.firebasestorage.app",
+    storageBucket: "exwater01.appspot.com",
     messagingSenderId: "166996899021",
     appId: "1:166996899021:web:c6ce758dc566dbc75b6584"
   };
+
   firebase.initializeApp(firebaseConfig);
   const db = firebase.database();
+
+  function updateTime() {
+    const now = new Date();
+    const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+    const formatted = kst.toISOString().replace("T", " ").substring(0, 19);
+    document.getElementById("currentTime").innerText = "현재 시각 (KST): " + formatted;
+  }
+  setInterval(updateTime, 1000);
+  updateTime();
 
   firebase.auth().onAuthStateChanged(user => {
     if (user) {
@@ -128,15 +137,6 @@
       });
     }
   });
-
-  function updateTime() {
-    const now = new Date();
-    const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-    const formatted = kst.toISOString().replace("T", " ").substring(0, 19);
-    document.getElementById("currentTime").innerText = "현재 시각 (KST): " + formatted;
-  }
-  setInterval(updateTime, 1000);
-  updateTime();
 
   function getKSTTimeString() {
     const now = new Date();
@@ -157,50 +157,54 @@
     const toggleBtn = document.getElementById("togglePump");
     const modeSelect = document.getElementById("modeSelect");
 
-    db.ref("sensor/temperature").on("value", snap => temp.innerText = snap.val() !== null ? snap.val() : "-");
-    db.ref("sensor/humidity").on("value", snap => humi.innerText = snap.val() !== null ? snap.val() : "-");
-    db.ref("sensor/moisture").on("value", snap => {
-      let val = snap.val();
-      soil.innerText = val !== null ? val : "-";
-    });
-
-    const pumpRef = db.ref("PUMP/STATE");
     let lastPumpState = null;
-    pumpRef.on("value", snap => {
-      const val = snap.val();
-      if (val !== null) {
-        pumpStatus.innerText = val ? "작동 중" : "정지";
-        toggleBtn.style.backgroundColor = val ? "green" : "blue";
-        toggleBtn.innerText = val ? "펌프 끄기" : "펌프 켜기";
-        toggleBtn.disabled = false;
 
-        if (lastPumpState !== null && val !== lastPumpState) {
-          logPumpChange(val);
+    function fetchSensorData() {
+      db.ref("sensor/temperature").get().then(snap => temp.innerText = snap.exists() ? snap.val() : "-");
+      db.ref("sensor/humidity").get().then(snap => humi.innerText = snap.exists() ? snap.val() : "-");
+      db.ref("sensor/moisture").get().then(snap => soil.innerText = snap.exists() ? snap.val() : "-");
+
+      db.ref("PUMP/STATE").get().then(snap => {
+        const val = snap.val();
+        if (val !== null) {
+          pumpStatus.innerText = val ? "작동 중" : "정지";
+          toggleBtn.style.backgroundColor = val ? "green" : "blue";
+          toggleBtn.innerText = val ? "펌프 끄기" : "펌프 켜기";
+          toggleBtn.disabled = false;
+
+          if (lastPumpState !== null && val !== lastPumpState) {
+            logPumpChange(val);
+          }
+          lastPumpState = val;
+        } else {
+          pumpStatus.innerText = "-";
+          toggleBtn.disabled = true;
         }
-        lastPumpState = val;
-      } else {
-        pumpStatus.innerText = "-";
-        toggleBtn.disabled = true;
-      }
-    });
+      });
 
-    const modeRef = db.ref("PUMP/MODE");
-    modeRef.on("value", snap => {
-      if (snap.exists()) {
-        const mode = snap.val();
-        modeSelect.value = mode;
-        toggleBtn.disabled = (mode === "auto");
-      }
-    });
+      db.ref("PUMP/MODE").get().then(snap => {
+        if (snap.exists()) {
+          const mode = snap.val();
+          modeSelect.value = mode;
+          toggleBtn.disabled = (mode === "auto");
+        }
+      });
+    }
+
+    // 초기 즉시 호출
+    fetchSensorData();
+
+    // 5초마다 반복 호출
+    setInterval(fetchSensorData, 5000);
 
     modeSelect.onchange = () => {
-      modeRef.set(modeSelect.value);
+      db.ref("PUMP/MODE").set(modeSelect.value);
     };
 
     toggleBtn.onclick = () => {
-      pumpRef.get().then(snap => {
+      db.ref("PUMP/STATE").get().then(snap => {
         const current = snap.val();
-        pumpRef.set(!current);
+        db.ref("PUMP/STATE").set(!current);
       });
     };
   }
