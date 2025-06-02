@@ -159,42 +159,47 @@
     const modeSelect = document.getElementById("modeSelect");
 
     let lastPumpState = null;
-    let manualPumpOnTime = null;
-    let manualPumpOffTime = null;
     let autoSwitchTimeout = null;
 
-    // 펌프 ON/OFF 로그 기록 및 상태 변경
     function setPumpState(newState) {
       db.ref("PUMP/STATE").set(newState);
       logPumpChange(newState);
     }
 
-    function fetchSensorData() {
-      db.ref("sensor/temperature").get().then(snap => temp.innerText = snap.exists() ? snap.val() : "-");
-      db.ref("sensor/humidity").get().then(snap => humi.innerText = snap.exists() ? snap.val() : "-");
-      db.ref("sensor/moisture").get().then(snap => soil.innerText = snap.exists() ? snap.val() : "-");
-    }
+    // 실시간 리스너로 센서값 업데이트 (30초마다 자동 갱신됨)
+    db.ref("sensor").on("value", snap => {
+      if (!snap.exists()) return;
+      const data = snap.val();
+      temp.innerText = data.temperature !== undefined ? data.temperature : "-";
+      humi.innerText = data.humidity !== undefined ? data.humidity : "-";
+      soil.innerText = data.moisture !== undefined ? data.moisture : "-";
+    });
 
-    function fetchPumpAndMode() {
-      db.ref("PUMP/STATE").get().then(snap => {
-        const val = snap.val();
-        if (val !== null) {
-          pumpStatus.innerText = val ? "작동 중" : "정지";
+    // 실시간 펌프 상태 & 모드 리스너
+    db.ref("PUMP/STATE").on("value", snap => {
+      const val = snap.val();
+      if (val !== null) {
+        pumpStatus.innerText = val ? "작동 중" : "정지";
+        if (val !== lastPumpState) {
+          logPumpChange(val);
           lastPumpState = val;
-        } else {
-          pumpStatus.innerText = "-";
-          lastPumpState = null;
         }
-      });
+        if (modeSelect.value === "manual") {
+          toggleBtn.style.backgroundColor = val ? "green" : "blue";
+          toggleBtn.innerText = val ? "펌프 끄기" : "펌프 켜기";
+        }
+      }
+    });
 
-      db.ref("PUMP/MODE").get().then(snap => {
-        if (snap.exists()) {
-          const mode = snap.val();
+    db.ref("PUMP/MODE").on("value", snap => {
+      if (snap.exists()) {
+        const mode = snap.val();
+        if (mode !== modeSelect.value) {
           modeSelect.value = mode;
           updateUIByMode(mode);
         }
-      });
-    }
+      }
+    });
 
     function updateUIByMode(mode) {
       if (mode === "auto") {
@@ -206,106 +211,40 @@
       }
     }
 
-    // 수동 모드에서 자동 모드 전환 타이머 설정
+    // 수동 모드 자동 전환 타이머 (3분 ON, 1분 OFF)
     function startAutoSwitchTimer(isPumpOn) {
       if (autoSwitchTimeout) {
         clearTimeout(autoSwitchTimeout);
         autoSwitchTimeout = null;
       }
-      const delay = isPumpOn ? 3 * 60 * 1000 : 1 * 60 * 1000; // ON: 3분, OFF: 1분
+      const delay = isPumpOn ? 3 * 60 * 1000 : 1 * 60 * 1000;
       autoSwitchTimeout = setTimeout(() => {
         db.ref("PUMP/MODE").set("auto");
-        modeSelect.value = "auto";
-        updateUIByMode("auto");
-        console.log(`🔁 수동 모드에서 자동 모드로 전환됨 (펌프 ${isPumpOn ? "ON 후 3분" : "OFF 후 1분"})`);
       }, delay);
     }
 
-    // 모드 변경 감지 및 처리
     modeSelect.onchange = () => {
       const selectedMode = modeSelect.value;
       db.ref("PUMP/MODE").set(selectedMode);
       updateUIByMode(selectedMode);
-      if (selectedMode === "manual") {
-        // 수동 모드 시작 시 자동 전환 타이머 리셋
-        if (autoSwitchTimeout) {
-          clearTimeout(autoSwitchTimeout);
-          autoSwitchTimeout = null;
-        }
+      if (selectedMode === "manual" && autoSwitchTimeout) {
+        clearTimeout(autoSwitchTimeout);
+        autoSwitchTimeout = null;
       }
     };
 
-    // 펌프 ON/OFF 버튼 클릭 시 처리 (수동 모드에서만)
     toggleBtn.onclick = () => {
       db.ref("PUMP/STATE").get().then(snap => {
         const current = snap.val();
         const newState = !current;
         setPumpState(newState);
-        // 수동 모드일 때 자동 전환 타이머 시작
         if (modeSelect.value === "manual") {
           startAutoSwitchTimer(newState);
         }
       });
     };
 
-    // 5초 간격으로 센서 및 펌프 상태, 모드 체크 및 UI 업데이트
-    setInterval(() => {
-      fetchSensorData();
-
-      // 펌프 상태는 실시간 반영
-      db.ref("PUMP/STATE").get().then(snap => {
-        const val = snap.val();
-        if (val !== null) {
-          pumpStatus.innerText = val ? "작동 중" : "정지";
-          if (val !== lastPumpState) {
-            logPumpChange(val);
-            lastPumpState = val;
-          }
-          // 버튼 색상 및 텍스트 업데이트 (수동 모드에서만)
-          if (modeSelect.value === "manual") {
-            toggleBtn.style.backgroundColor = val ? "green" : "blue";
-            toggleBtn.innerText = val ? "펌프 끄기" : "펌프 켜기";
-          }
-        }
-      });
-
-      // 모드 값 변경 감지 (자동/수동)
-      db.ref("PUMP/MODE").get().then(snap => {
-        if (snap.exists()) {
-          const mode = snap.val();
-          if (mode !== modeSelect.value) {
-            modeSelect.value = mode;
-            updateUIByMode(mode);
-          }
-        }
-      });
-
-    }, 5000);
-
-    // 자동 모드에서 토양습도 조건에 따른 펌프 자동 제어 (5초마다 한번 체크)
-    setInterval(() => {
-      if (modeSelect.value === "auto") {
-        db.ref("sensor/moisture").get().then(snap => {
-          if (!snap.exists()) return;
-          const soilMoisture = snap.val();
-
-          db.ref("PUMP/STATE").get().then(snapPump => {
-            const pumpState = snapPump.val();
-
-            // 토양습도 기준 예시: 30 이하일 때 펌프 ON, 50 이상일 때 OFF (필요 시 수정)
-            if (soilMoisture <= 30 && pumpState !== true) {
-              setPumpState(true);
-            } else if (soilMoisture >= 50 && pumpState !== false) {
-              setPumpState(false);
-            }
-          });
-        });
-      }
-    }, 5000);
-
-    // 초기 데이터 로딩
-    fetchSensorData();
-    fetchPumpAndMode();
+    updateUIByMode(modeSelect.value);
   }
 
   document.getElementById("logoutBtn").onclick = () => {
