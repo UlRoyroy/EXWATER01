@@ -1,94 +1,279 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
-  <title>스마트 급수 시스템</title>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+  <meta charset="UTF-8" />
+  <title>EXWATER 관수 시스템</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     body {
-      font-family: 'Segoe UI', sans-serif;
+      font-family: Arial, sans-serif;
       text-align: center;
-      background: #f1f1f1;
-      padding: 2rem;
+      background-color: #f9f9f9;
+      margin: 0;
+      padding: 0 10px 40px;
     }
-    .card {
-      background: white;
-      border-radius: 12px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-      padding: 1.5rem;
-      margin: 1rem auto;
-      max-width: 400px;
+    h1 {
+      margin-top: 30px;
     }
-    h2 { margin-bottom: 0.5rem; }
-    .sensor { font-size: 1.2rem; margin: 0.3rem 0; }
-    button {
-      background: #007bff;
-      color: white;
-      border: none;
-      padding: 0.6rem 1.2rem;
-      margin-top: 1rem;
-      font-size: 1rem;
-      border-radius: 6px;
+    #currentTime {
+      font-size: 1.1rem;
+      color: #333;
+      margin-bottom: 20px;
+    }
+    .status-card {
+      display: inline-block;
+      background-color: white;
+      padding: 20px;
+      margin: 15px;
+      border-radius: 15px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      width: 300px;
+    }
+    .status-card h2 {
+      margin-bottom: 10px;
+    }
+    .status-card p {
+      margin: 8px 0;
+    }
+    .status-card button, select {
+      padding: 10px;
+      font-size: 16px;
+      margin-top: 10px;
+      width: 80%;
+      border-radius: 10px;
       cursor: pointer;
     }
-    button:hover { background: #0056b3; }
+    .status-card button {
+      background-color: blue;
+      color: white;
+      border: none;
+      transition: background-color 0.3s ease;
+    }
+    .status-card button:hover:not(:disabled) {
+      opacity: 0.8;
+    }
+    .status-card button:disabled {
+      background-color: grey;
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+    #logoutBtn {
+      margin-top: 30px;
+      background-color: #555;
+      color: white;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    footer {
+      margin-top: 40px;
+      font-size: 0.9rem;
+      color: #666;
+    }
   </style>
 </head>
 <body>
 
-  <div class="card">
-    <h2>🌱 스마트 급수 시스템</h2>
-    <div class="sensor" id="temp">온도: -- ℃</div>
-    <div class="sensor" id="humi">습도: -- %</div>
-    <div class="sensor" id="moist">토양 수분: --</div>
-    <div class="sensor" id="state">펌프 상태: --</div>
-    <div class="sensor" id="mode">모드: --</div>
-    <div class="sensor" id="runtime">가동시간: --초</div>
-    <div class="sensor" id="time">업데이트: --</div>
-    <button onclick="toggleMode()">모드 전환</button>
+<h1>EXWATER 관수 시스템</h1>
+<p id="currentTime">현재 시각 (KST): -</p>
+
+<div id="loginForm" style="display:none">
+  <input type="email" id="email" placeholder="이메일" required><br>
+  <input type="password" id="password" placeholder="비밀번호" required><br>
+  <button id="loginBtn">로그인</button>
+</div>
+
+<div id="dashboard" style="display:none">
+  <div class="status-card">
+    <h2>환경 정보</h2>
+    <p>온도: <span id="temp">-</span> ℃</p>
+    <p>습도: <span id="humi">-</span> %</p>
+    <p>토양습도: <span id="soil">-</span></p>
+    <p>펌프 상태: <span id="pumpStatus">-</span></p>
+    <p>마지막 작동 시각: <span id="pumpTime">-</span></p>
+    <p>작동 시간: <span id="pumpRuntime">-</span> 초</p>
+    <p>모드: 
+      <select id="modeSelect">
+        <option value="auto">자동</option>
+        <option value="manual">수동</option>
+      </select>
+    </p>
+    <button id="togglePump" style="display:none;" disabled>펌프 ON/OFF</button>
   </div>
+  <button id="logoutBtn">로그아웃</button>
+</div>
 
-  <script>
-    // Firebase 설정
-    const firebaseConfig = {
-      apiKey: "AIzaSyAeHP9-GL_uC4c7i9d1R0QCgd99NdzKWD0",
-      authDomain: "exwater01.firebaseapp.com",
-      databaseURL: "https://exwater01-default-rtdb.asia-southeast1.firebasedatabase.app",
-      projectId: "exwater01",
-      storageBucket: "exwater01.appspot.com",
-      messagingSenderId: "YOUR_ID",
-      appId: "YOUR_APP_ID"
-    };
+<footer>
+  © 2025 EXWATER 스마트 관수 시스템
+</footer>
 
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
 
-    const el = id => document.getElementById(id);
+<script>
+  // Firebase 초기화
+  const firebaseConfig = {
+    apiKey: "AIzaSyDir8gHZqsrExrIhF9nzBy4KbGINOuD2q8",
+    authDomain: "exwater01.firebaseapp.com",
+    databaseURL: "https://exwater01-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "exwater01",
+    storageBucket: "exwater01.appspot.com",
+    messagingSenderId: "166996899021",
+    appId: "1:166996899021:web:c6ce758dc566dbc75b6584"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
 
-    function updateUI(snapshot) {
-      const s = snapshot.val();
-      if (!s) return;
+  // 현재 KST 시간 표시 (매초 갱신)
+  function updateTime() {
+    const now = new Date();
+    const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+    const formatted = kst.toISOString().replace("T", " ").substring(0, 19);
+    document.getElementById("currentTime").innerText = "현재 시각 (KST): " + formatted;
+  }
+  setInterval(updateTime, 1000);
+  updateTime();
 
-      el("temp").innerText = `온도: ${s.sensor?.temperature ?? '--'} ℃`;
-      el("humi").innerText = `습도: ${s.sensor?.humidity ?? '--'} %`;
-      el("moist").innerText = `토양 수분: ${s.sensor?.moisture ?? '--'}`;
-      el("state").innerText = `펌프 상태: ${s.PUMP?.STATE ? 'ON 💧' : 'OFF'}`;
-      el("mode").innerText = `모드: ${s.PUMP?.MODE ?? '--'}`;
-      el("runtime").innerText = `가동시간: ${s.PUMP?.runtime ?? '--'}초`;
-      el("time").innerText = `업데이트: ${s.PUMP?.time ?? '--'}`;
-    }
-
-    db.ref().on("value", updateUI);
-
-    function toggleMode() {
-      db.ref("/PUMP/MODE").once("value").then(snapshot => {
-        const current = snapshot.val();
-        const next = current === "auto" ? "manual" : "auto";
-        db.ref("/PUMP/MODE").set(next);
+  // 익명 로그인 상태 관리 및 대시보드 표시
+  firebase.auth().onAuthStateChanged(user => {
+    if (user) {
+      document.getElementById("dashboard").style.display = "block";
+      document.getElementById("loginForm").style.display = "none";
+      startMonitoring();
+    } else {
+      // 익명 로그인 시도
+      firebase.auth().signInAnonymously().catch(err => {
+        alert("익명 로그인 실패: " + err.message);
       });
     }
-  </script>
+  });
+
+  // KST 기준 현재 시각 문자열 (HH:MM:SS)
+  function getKSTTimeString() {
+    const now = new Date();
+    const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+    return kst.toTimeString().substring(0, 8);
+  }
+
+  // 펌프 상태 변경 시 메타 정보 업데이트 (시간, 작동 시간)
+  function updatePumpMeta(newState) {
+    const timeNow = getKSTTimeString();
+    db.ref("PUMP/time").set(timeNow);
+    // 작동 시간 예시: ON 시 180초, OFF 시 0초 (필요 시 변경)
+    db.ref("PUMP/runtime").set(newState ? 180 : 0);
+  }
+
+  // 대시보드 데이터 실시간 모니터링 및 UI 제어 함수
+  function startMonitoring() {
+    const temp = document.getElementById("temp");
+    const humi = document.getElementById("humi");
+    const soil = document.getElementById("soil");
+    const pumpStatus = document.getElementById("pumpStatus");
+    const pumpTime = document.getElementById("pumpTime");
+    const pumpRuntime = document.getElementById("pumpRuntime");
+    const toggleBtn = document.getElementById("togglePump");
+    const modeSelect = document.getElementById("modeSelect");
+
+    let lastPumpState = null;
+    let autoSwitchTimeout = null;
+
+    // 센서 데이터 실시간 수신
+    db.ref("sensor").on("value", snap => {
+      const data = snap.val() || {};
+      temp.innerText = data.temperature ?? "-";
+      humi.innerText = data.humidity ?? "-";
+      soil.innerText = data.moisture ?? "-";
+    });
+
+    // 펌프 상태 실시간 수신 및 UI 업데이트
+    db.ref("PUMP/STATE").on("value", snap => {
+      const val = snap.val();
+      if (val !== null) {
+        pumpStatus.innerText = val ? "작동 중" : "정지";
+
+        // 상태가 변경됐을 때만 메타 업데이트 (중복 방지)
+        if (val !== lastPumpState) {
+          updatePumpMeta(val);
+          lastPumpState = val;
+        }
+
+        // 수동 모드일 때만 버튼 활성화 및 상태 반영
+        if (modeSelect.value === "manual") {
+          toggleBtn.style.display = "inline-block";
+          toggleBtn.disabled = false;
+          toggleBtn.style.backgroundColor = val ? "green" : "blue";
+          toggleBtn.innerText = val ? "펌프 끄기" : "펌프 켜기";
+        } else {
+          toggleBtn.style.display = "none";
+          toggleBtn.disabled = true;
+        }
+      }
+    });
+
+    // 마지막 펌프 작동 시간 실시간 수신
+    db.ref("PUMP/time").on("value", snap => {
+      pumpTime.innerText = snap.val() || "-";
+    });
+
+    // 펌프 작동 시간 실시간 수신
+    db.ref("PUMP/runtime").on("value", snap => {
+      pumpRuntime.innerText = snap.val() ?? "-";
+    });
+
+    // 모드 실시간 수신 및 UI 업데이트
+    db.ref("PUMP/MODE").on("value", snap => {
+      const mode = snap.val();
+      if (mode && mode !== modeSelect.value) {
+        modeSelect.value = mode;
+        updateUIByMode(mode);
+      }
+    });
+
+    // 모드에 따른 UI 제어 함수
+    function updateUIByMode(mode) {
+      if (mode === "auto") {
+        toggleBtn.style.display = "none";
+        toggleBtn.disabled = true;
+      } else if (mode === "manual") {
+        toggleBtn.style.display = "inline-block";
+        toggleBtn.disabled = false;
+      }
+    }
+
+    // 수동 모드 ON/OFF 버튼 클릭 시 펌프 상태 토글 및 DB 업데이트
+    toggleBtn.onclick = () => {
+      db.ref("PUMP/STATE").get().then(snap => {
+        const current = snap.val();
+        const newState = !current;
+        db.ref("PUMP/STATE").set(newState);
+        updatePumpMeta(newState);
+      }).catch(err => {
+        alert("펌프 상태 가져오기 실패: " + err.message);
+      });
+    };
+
+    // 모드 변경 시 DB에 반영 및 UI 업데이트
+    modeSelect.onchange = () => {
+      const selected = modeSelect.value;
+      db.ref("PUMP/MODE").set(selected);
+      updateUIByMode(selected);
+    };
+
+    // 초기 UI 셋업
+    updateUIByMode(modeSelect.value);
+  }
+
+  // 로그아웃 버튼 클릭 시 Firebase 로그아웃 처리
+  document.getElementById("logoutBtn").onclick = () => {
+    firebase.auth().signOut().then(() => {
+      document.getElementById("dashboard").style.display = "none";
+    });
+  };
+</script>
 
 </body>
 </html>
