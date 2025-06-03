@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8" />
-  <title>EXWATER 관수 시스템</title>
+  <title>EXWATER 스마트 관수 시스템</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     body {
@@ -76,8 +76,8 @@
 </head>
 <body>
 
-<h1>EXWATER 관수 시스템</h1>
-<p id="currentTime">현재 시각 (KST): -</p>
+<h1>EXWATER 스마트 관수 시스템</h1>
+<p id="currentTime">현재 시각 (KST) : -</p>
 
 <div id="loginForm" style="display:none">
   <input type="email" id="email" placeholder="이메일" required><br>
@@ -92,10 +92,10 @@
     <p>습도: <span id="humi">-</span> %</p>
     <p>토양습도: <span id="soil">-</span></p>
     <p>펌프 상태: <span id="pumpStatus">-</span></p>
-    <p>마지막 작동 시각: <span id="pumpTime">-</span></p>
+    <p>마지막 작동 시각: <span id="pumpClock">-</span></p>
     <p>작동 시간: <span id="pumpRuntime">-</span> 초</p>
     <p>모드: 
-      <select id="modeSelect">
+      <select id="typeSelect">
         <option value="auto">자동</option>
         <option value="manual">수동</option>
       </select>
@@ -157,7 +157,7 @@
 
   function updatePumpMeta(newState) {
     const timeNow = getKSTTimeString();
-    db.ref("pump/time").set(timeNow);
+    db.ref("pump/clock").set(timeNow);
     db.ref("pump/runtime").set(newState ? 180 : 0);
   }
 
@@ -166,10 +166,10 @@
     const humi = document.getElementById("humi");
     const soil = document.getElementById("soil");
     const pumpStatus = document.getElementById("pumpStatus");
-    const pumpTime = document.getElementById("pumpTime");
+    const pumpClock = document.getElementById("pumpClock");
     const pumpRuntime = document.getElementById("pumpRuntime");
     const toggleBtn = document.getElementById("togglePump");
-    const modeSelect = document.getElementById("modeSelect");
+    const typeSelect = document.getElementById("typeSelect");
 
     let lastPumpState = null;
 
@@ -189,7 +189,7 @@
           lastPumpState = val;
         }
 
-        if (modeSelect.value === "manual") {
+        if (typeSelect.value === "manual") {
           toggleBtn.style.display = "inline-block";
           toggleBtn.disabled = false;
           toggleBtn.style.backgroundColor = val ? "green" : "blue";
@@ -201,8 +201,8 @@
       }
     });
 
-    db.ref("pump/time").on("value", snap => {
-      pumpTime.innerText = snap.val() || "-";
+    db.ref("pump/clock").on("value", snap => {
+      pumpClock.innerText = snap.val() || "-";
     });
 
     db.ref("pump/runtime").on("value", snap => {
@@ -210,14 +210,14 @@
     });
 
     db.ref("pump/type").on("value", snap => {
-      const mode = snap.val();
-      if (mode && mode !== modeSelect.value) {
-        modeSelect.value = mode;
-        updateUIByMode(mode);
+      const type = snap.val();
+      if (type && type !== typeSelect.value) {
+        typeSelect.value = type;
+        updateUIByType(type);
       }
     });
 
-    function updateUIByMode(type) {
+    function updateUIByType(type) {
       if (type === "auto") {
         toggleBtn.style.display = "none";
         toggleBtn.disabled = true;
@@ -245,13 +245,13 @@
       });
     };
 
-    modeSelect.onchange = () => {
-      const selected = modeSelect.value;
+    typeSelect.onchange = () => {
+      const selected = typeSelect.value;
       db.ref("pump/type").set(selected);
-      updateUIByMode(selected);
+      updateUIByType(selected);
     };
 
-    updateUIByMode(modeSelect.value);
+    updateUIByType(typeSelect.value);
   }
 
   document.getElementById("logoutBtn").onclick = () => {
