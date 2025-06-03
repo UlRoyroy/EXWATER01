@@ -35,14 +35,13 @@
     .status-card p {
       margin: 8px 0;
     }
-    .status-card button, select, input {
+    .status-card button, select {
       padding: 10px;
       font-size: 16px;
       margin-top: 10px;
       width: 80%;
       border-radius: 10px;
       cursor: pointer;
-      box-sizing: border-box;
     }
     .status-card button {
       background-color: blue;
@@ -73,11 +72,6 @@
       font-size: 0.9rem;
       color: #666;
     }
-    #loginError {
-      color: red;
-      margin-top: 10px;
-      font-weight: bold;
-    }
   </style>
 </head>
 <body>
@@ -85,11 +79,10 @@
 <h1>EXWATER 관수 시스템</h1>
 <p id="currentTime">현재 시각 (KST): -</p>
 
-<div id="loginForm">
+<div id="loginForm" style="display:none">
   <input type="email" id="email" placeholder="이메일" required><br>
   <input type="password" id="password" placeholder="비밀번호" required><br>
   <button id="loginBtn">로그인</button>
-  <p id="loginError"></p>
 </div>
 
 <div id="dashboard" style="display:none">
@@ -135,10 +128,6 @@
   firebase.initializeApp(firebaseConfig);
   const db = firebase.database();
 
-  // 허용된 사용자 UID (rules에 맞게)
-  const allowedUID = 'MFrT0YMI0fNzeXcY1ZyehkMkpTQ2';
-
-  // 현재 KST 시간 표시 (매초 갱신)
   function updateTime() {
     const now = new Date();
     const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
@@ -148,69 +137,30 @@
   setInterval(updateTime, 1000);
   updateTime();
 
-  // 로그인 UI 엘리먼트
-  const loginForm = document.getElementById("loginForm");
-  const dashboard = document.getElementById("dashboard");
-  const loginBtn = document.getElementById("loginBtn");
-  const loginError = document.getElementById("loginError");
-
-  // 로그인 시도
-  loginBtn.onclick = () => {
-    loginError.innerText = "";
-    const email = document.getElementById("email").value.trim();
-    const password = document.getElementById("password").value;
-    if (!email || !password) {
-      loginError.innerText = "이메일과 비밀번호를 입력하세요.";
-      return;
-    }
-    firebase.auth().signInWithEmailAndPassword(email, password)
-      .then(({ user }) => {
-        // 로그인 성공 후 UID 체크
-        if (user.uid !== allowedUID) {
-          loginError.innerText = "접근 권한이 없습니다.";
-          firebase.auth().signOut();
-        }
-        // 정상 로그인일 경우 대시보드 표시는 onAuthStateChanged에서 처리
-      })
-      .catch(error => {
-        loginError.innerText = "로그인 실패: " + error.message;
-      });
-  };
-
-  // 로그인 상태 변경 시 처리
   firebase.auth().onAuthStateChanged(user => {
     if (user) {
-      if (user.uid !== allowedUID) {
-        // 허용되지 않은 UID면 강제 로그아웃
-        alert("접근 권한이 없는 사용자입니다.");
-        firebase.auth().signOut();
-        return;
-      }
-      loginForm.style.display = "none";
-      dashboard.style.display = "block";
+      document.getElementById("dashboard").style.display = "block";
+      document.getElementById("loginForm").style.display = "none";
       startMonitoring();
     } else {
-      loginForm.style.display = "block";
-      dashboard.style.display = "none";
+      firebase.auth().signInAnonymously().catch(err => {
+        alert("익명 로그인 실패: " + err.message);
+      });
     }
   });
 
-  // KST 기준 현재 시각 문자열 (HH:MM:SS)
   function getKSTTimeString() {
     const now = new Date();
     const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
     return kst.toTimeString().substring(0, 8);
   }
 
-  // 펌프 상태 변경 시 메타 정보 업데이트 (시간, 작동 시간)
   function updatePumpMeta(newState) {
     const timeNow = getKSTTimeString();
-    db.ref("PUMP/time").set(timeNow);
-    // 작동 시간 예시: ON 시 180초, OFF 시 0초 (필요 시 변경)
-    db.ref("PUMP/runtime").set(newState ? 180 : 0);
+    db.ref("pump/time").set(timeNow);
+    db.ref("pump/runtime").set(newState ? 180 : 0);
   }
 
-  // 대시보드 데이터 실시간 모니터링 및 UI 제어 함수
   function startMonitoring() {
     const temp = document.getElementById("temp");
     const humi = document.getElementById("humi");
@@ -223,7 +173,6 @@
 
     let lastPumpState = null;
 
-    // 센서 데이터 실시간 수신
     db.ref("sensor").on("value", snap => {
       const data = snap.val() || {};
       temp.innerText = data.temperature ?? "-";
@@ -231,19 +180,15 @@
       soil.innerText = data.moisture ?? "-";
     });
 
-    // 펌프 상태 실시간 수신 및 UI 업데이트
-    db.ref("PUMP/STATE").on("value", snap => {
+    db.ref("pump/state").on("value", snap => {
       const val = snap.val();
       if (val !== null) {
         pumpStatus.innerText = val ? "작동 중" : "정지";
-
-        // 상태가 변경됐을 때만 메타 업데이트 (중복 방지)
         if (val !== lastPumpState) {
           updatePumpMeta(val);
           lastPumpState = val;
         }
 
-        // 수동 모드일 때만 버튼 활성화 및 상태 반영
         if (modeSelect.value === "manual") {
           toggleBtn.style.display = "inline-block";
           toggleBtn.disabled = false;
@@ -256,18 +201,15 @@
       }
     });
 
-    // 마지막 펌프 작동 시간 실시간 수신
-    db.ref("PUMP/time").on("value", snap => {
+    db.ref("pump/time").on("value", snap => {
       pumpTime.innerText = snap.val() || "-";
     });
 
-    // 펌프 작동 시간 실시간 수신
-    db.ref("PUMP/runtime").on("value", snap => {
+    db.ref("pump/runtime").on("value", snap => {
       pumpRuntime.innerText = snap.val() ?? "-";
     });
 
-    // 모드 실시간 수신 및 UI 업데이트
-    db.ref("PUMP/MODE").on("value", snap => {
+    db.ref("pump/type").on("value", snap => {
       const mode = snap.val();
       if (mode && mode !== modeSelect.value) {
         modeSelect.value = mode;
@@ -275,43 +217,47 @@
       }
     });
 
-    // 모드에 따른 UI 제어 함수
-    function updateUIByMode(mode) {
-      if (mode === "auto") {
+    function updateUIByMode(type) {
+      if (type === "auto") {
         toggleBtn.style.display = "none";
         toggleBtn.disabled = true;
-      } else if (mode === "manual") {
+      } else if (type === "manual") {
         toggleBtn.style.display = "inline-block";
         toggleBtn.disabled = false;
+
+        // 버튼 상태 초기화
+        db.ref("pump/state").get().then(snap => {
+          const current = snap.val();
+          toggleBtn.style.backgroundColor = current ? "green" : "blue";
+          toggleBtn.innerText = current ? "펌프 끄기" : "펌프 켜기";
+        });
       }
     }
 
-    // 수동 모드 ON/OFF 버튼 클릭 시 펌프 상태 토글 및 DB 업데이트
     toggleBtn.onclick = () => {
-      db.ref("PUMP/STATE").get().then(snap => {
+      db.ref("pump/state").get().then(snap => {
         const current = snap.val();
         const newState = !current;
-        db.ref("PUMP/STATE").set(newState);
+        db.ref("pump/state").set(newState);
         updatePumpMeta(newState);
       }).catch(err => {
         alert("펌프 상태 가져오기 실패: " + err.message);
       });
     };
 
-    // 모드 변경 시 DB에 반영 및 UI 업데이트
     modeSelect.onchange = () => {
       const selected = modeSelect.value;
-      db.ref("PUMP/MODE").set(selected);
+      db.ref("pump/type").set(selected);
       updateUIByMode(selected);
     };
 
-    // 초기 UI 셋업
     updateUIByMode(modeSelect.value);
   }
 
-  // 로그아웃 버튼 클릭 시 Firebase 로그아웃 처리
   document.getElementById("logoutBtn").onclick = () => {
-    firebase.auth().signOut();
+    firebase.auth().signOut().then(() => {
+      document.getElementById("dashboard").style.display = "none";
+    });
   };
 </script>
 
