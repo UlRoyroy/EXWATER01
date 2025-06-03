@@ -72,6 +72,14 @@
       font-size: 0.9rem;
       color: #666;
     }
+    input {
+      padding: 10px;
+      width: 80%;
+      margin: 5px;
+      font-size: 16px;
+      border-radius: 10px;
+      border: 1px solid #ccc;
+    }
   </style>
 </head>
 <body>
@@ -115,7 +123,6 @@
 <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
 
 <script>
-  // Firebase 초기화
   const firebaseConfig = {
     apiKey: "AIzaSyDir8gHZqsrExrIhF9nzBy4KbGINOuD2q8",
     authDomain: "exwater01.firebaseapp.com",
@@ -128,7 +135,7 @@
   firebase.initializeApp(firebaseConfig);
   const db = firebase.database();
 
-  // KST 시간 표시
+  // 시간 표시 (KST)
   function updateTime() {
     const now = new Date();
     const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
@@ -138,38 +145,28 @@
   setInterval(updateTime, 1000);
   updateTime();
 
-  // 로그인 상태 처리
-  firebase.auth().onAuthStateChanged(user => {
-    if (user) {
-      document.getElementById("dashboard").style.display = "block";
-      document.getElementById("loginForm").style.display = "none";
-      startMonitoring();
+  function getKSTTimeString() {
+    const now = new Date();
+    const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+    return kst.toTimeString().substring(0, 8);
+  }
+
+  function updatePumpMeta(state) {
+    db.ref("pump/clock").set(getKSTTimeString());
+    db.ref("pump/runtime").set(state ? 180 : 0);
+  }
+
+  function updateUIByMode(mode) {
+    const toggleBtn = document.getElementById("togglePump");
+    if (mode === "manual") {
+      toggleBtn.style.display = "inline-block";
+      toggleBtn.disabled = false;
     } else {
-      document.getElementById("dashboard").style.display = "none";
-      document.getElementById("loginForm").style.display = "block";
+      toggleBtn.style.display = "none";
+      toggleBtn.disabled = true;
     }
-  });
+  }
 
-  // 로그인 버튼 이벤트
-  document.getElementById("loginBtn").onclick = () => {
-    const email = document.getElementById("email").value;
-    const password = document.getElementById("password").value;
-
-    firebase.auth().signInWithEmailAndPassword(email, password)
-      .then(() => {
-        // 로그인 성공
-      })
-      .catch(error => {
-        alert("로그인 실패: " + error.message);
-      });
-  };
-
-  // 로그아웃 버튼
-  document.getElementById("logoutBtn").onclick = () => {
-    firebase.auth().signOut();
-  };
-
-  // 데이터 실시간 모니터링
   function startMonitoring() {
     const temp = document.getElementById("temp");
     const humi = document.getElementById("humi");
@@ -180,8 +177,6 @@
     const toggleBtn = document.getElementById("togglePump");
     const modeSelect = document.getElementById("modeSelect");
 
-    let lastPumpState = null;
-
     db.ref("sensor").on("value", snap => {
       const data = snap.val() || {};
       temp.innerText = data.temperature ?? "-";
@@ -190,25 +185,11 @@
     });
 
     db.ref("pump/state").on("value", snap => {
-      const val = snap.val();
-      if (val !== null) {
-        pumpStatus.innerText = val ? "작동 중" : "정지";
-
-        if (val !== lastPumpState) {
-          updatePumpMeta(val);
-          lastPumpState = val;
-        }
-
-        if (modeSelect.value === "manual") {
-          toggleBtn.style.display = "inline-block";
-          toggleBtn.disabled = false;
-          toggleBtn.style.backgroundColor = val ? "green" : "blue";
-          toggleBtn.innerText = val ? "펌프 끄기" : "펌프 켜기";
-        } else {
-          toggleBtn.style.display = "none";
-          toggleBtn.disabled = true;
-        }
-      }
+      const state = snap.val();
+      pumpStatus.innerText = state ? "작동 중" : "정지";
+      toggleBtn.innerText = state ? "펌프 끄기" : "펌프 켜기";
+      toggleBtn.style.backgroundColor = state ? "green" : "blue";
+      toggleBtn.disabled = (modeSelect.value !== "manual");
     });
 
     db.ref("pump/clock").on("value", snap => {
@@ -221,7 +202,7 @@
 
     db.ref("pump/type").on("value", snap => {
       const mode = snap.val();
-      if (mode && mode !== modeSelect.value) {
+      if (mode) {
         modeSelect.value = mode;
         updateUIByMode(mode);
       }
@@ -233,9 +214,7 @@
         const newState = !current;
         db.ref("pump/state").set(newState);
         updatePumpMeta(newState);
-      }).catch(err => {
-        alert("펌프 상태 가져오기 실패: " + err.message);
-      });
+      }).catch(err => alert("펌프 제어 실패: " + err.message));
     };
 
     modeSelect.onchange = () => {
@@ -243,27 +222,36 @@
       db.ref("pump/type").set(selected);
       updateUIByMode(selected);
     };
-
-    function updatePumpMeta(newState) {
-      const now = new Date();
-      const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-      const timeStr = kst.toTimeString().substring(0, 8);
-      db.ref("pump/clock").set(timeStr);
-      db.ref("pump/runtime").set(newState ? 180 : 0);
-    }
-
-    function updateUIByMode(mode) {
-      if (mode === "auto") {
-        toggleBtn.style.display = "none";
-        toggleBtn.disabled = true;
-      } else if (mode === "manual") {
-        toggleBtn.style.display = "inline-block";
-        toggleBtn.disabled = false;
-      }
-    }
-
-    updateUIByMode(modeSelect.value);
   }
+
+  // 로그인 로직
+  document.getElementById("loginBtn").onclick = () => {
+    const email = document.getElementById("email").value;
+    const pw = document.getElementById("password").value;
+    firebase.auth().signInWithEmailAndPassword(email, pw)
+      .then(() => {
+        document.getElementById("loginForm").style.display = "none";
+        document.getElementById("dashboard").style.display = "block";
+        startMonitoring();
+      })
+      .catch(err => alert("로그인 실패: " + err.message));
+  };
+
+  document.getElementById("logoutBtn").onclick = () => {
+    firebase.auth().signOut().then(() => {
+      document.getElementById("dashboard").style.display = "none";
+      document.getElementById("loginForm").style.display = "block";
+    });
+  };
+
+  // 로그인 유지 처리
+  firebase.auth().onAuthStateChanged(user => {
+    if (user) {
+      document.getElementById("loginForm").style.display = "none";
+      document.getElementById("dashboard").style.display = "block";
+      startMonitoring();
+    }
+  });
 </script>
 
 </body>
