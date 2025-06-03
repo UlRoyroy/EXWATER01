@@ -35,13 +35,14 @@
     .status-card p {
       margin: 8px 0;
     }
-    .status-card button, select {
+    .status-card button, select, input {
       padding: 10px;
       font-size: 16px;
       margin-top: 10px;
       width: 80%;
       border-radius: 10px;
       cursor: pointer;
+      box-sizing: border-box;
     }
     .status-card button {
       background-color: blue;
@@ -72,6 +73,11 @@
       font-size: 0.9rem;
       color: #666;
     }
+    #loginError {
+      color: red;
+      margin-top: 10px;
+      font-weight: bold;
+    }
   </style>
 </head>
 <body>
@@ -79,10 +85,11 @@
 <h1>EXWATER 관수 시스템</h1>
 <p id="currentTime">현재 시각 (KST): -</p>
 
-<div id="loginForm" style="display:none">
+<div id="loginForm">
   <input type="email" id="email" placeholder="이메일" required><br>
   <input type="password" id="password" placeholder="비밀번호" required><br>
   <button id="loginBtn">로그인</button>
+  <p id="loginError"></p>
 </div>
 
 <div id="dashboard" style="display:none">
@@ -128,6 +135,9 @@
   firebase.initializeApp(firebaseConfig);
   const db = firebase.database();
 
+  // 허용된 사용자 UID (rules에 맞게)
+  const allowedUID = 'MFrT0YMI0fNzeXcY1ZyehkMkpTQ2';
+
   // 현재 KST 시간 표시 (매초 갱신)
   function updateTime() {
     const now = new Date();
@@ -138,17 +148,50 @@
   setInterval(updateTime, 1000);
   updateTime();
 
-  // 익명 로그인 상태 관리 및 대시보드 표시
+  // 로그인 UI 엘리먼트
+  const loginForm = document.getElementById("loginForm");
+  const dashboard = document.getElementById("dashboard");
+  const loginBtn = document.getElementById("loginBtn");
+  const loginError = document.getElementById("loginError");
+
+  // 로그인 시도
+  loginBtn.onclick = () => {
+    loginError.innerText = "";
+    const email = document.getElementById("email").value.trim();
+    const password = document.getElementById("password").value;
+    if (!email || !password) {
+      loginError.innerText = "이메일과 비밀번호를 입력하세요.";
+      return;
+    }
+    firebase.auth().signInWithEmailAndPassword(email, password)
+      .then(({ user }) => {
+        // 로그인 성공 후 UID 체크
+        if (user.uid !== allowedUID) {
+          loginError.innerText = "접근 권한이 없습니다.";
+          firebase.auth().signOut();
+        }
+        // 정상 로그인일 경우 대시보드 표시는 onAuthStateChanged에서 처리
+      })
+      .catch(error => {
+        loginError.innerText = "로그인 실패: " + error.message;
+      });
+  };
+
+  // 로그인 상태 변경 시 처리
   firebase.auth().onAuthStateChanged(user => {
     if (user) {
-      document.getElementById("dashboard").style.display = "block";
-      document.getElementById("loginForm").style.display = "none";
+      if (user.uid !== allowedUID) {
+        // 허용되지 않은 UID면 강제 로그아웃
+        alert("접근 권한이 없는 사용자입니다.");
+        firebase.auth().signOut();
+        return;
+      }
+      loginForm.style.display = "none";
+      dashboard.style.display = "block";
       startMonitoring();
     } else {
-      // 익명 로그인 시도
-      firebase.auth().signInAnonymously().catch(err => {
-        alert("익명 로그인 실패: " + err.message);
-      });
+      loginForm.style.display = "block";
+      dashboard.style.display = "none";
     }
   });
 
@@ -179,7 +222,6 @@
     const modeSelect = document.getElementById("modeSelect");
 
     let lastPumpState = null;
-    let autoSwitchTimeout = null;
 
     // 센서 데이터 실시간 수신
     db.ref("sensor").on("value", snap => {
@@ -269,9 +311,7 @@
 
   // 로그아웃 버튼 클릭 시 Firebase 로그아웃 처리
   document.getElementById("logoutBtn").onclick = () => {
-    firebase.auth().signOut().then(() => {
-      document.getElementById("dashboard").style.display = "none";
-    });
+    firebase.auth().signOut();
   };
 </script>
 
