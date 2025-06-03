@@ -169,11 +169,14 @@
       toggleBtn.style.display = "none";
       toggleBtn.disabled = true;
       clearTimeout(manualPumpTimeout);
+      stopRuntimeTimer();
     }
   }
 
   function startRuntimeTimer() {
     clearInterval(runtimeInterval);
+    currentRuntime = 0;
+    document.getElementById("pumpRuntime").innerText = currentRuntime;
     runtimeInterval = setInterval(() => {
       currentRuntime++;
       document.getElementById("pumpRuntime").innerText = currentRuntime;
@@ -209,9 +212,14 @@
       toggleBtn.style.backgroundColor = state ? "green" : "blue";
       toggleBtn.disabled = (modeSelect.value !== "manual");
 
+      if (state && modeSelect.value === "manual") {
+        startRuntimeTimer();
+      } else {
+        stopRuntimeTimer();
+      }
+
       if (!state) {
         clearTimeout(manualPumpTimeout);
-        stopRuntimeTimer();
       }
     });
 
@@ -246,7 +254,7 @@
             db.ref("pump/state").set(false);
             db.ref("pump/type").set("auto");
             alert("3분 경과: 펌프 OFF 및 자동모드 전환");
-          }, 180000); // 3분
+          }, 180000);
         } else {
           clearTimeout(manualPumpTimeout);
         }
