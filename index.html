@@ -121,6 +121,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
 
+<!-- 전체 내용 동일, 아래 <script> 부분만 교체 -->
 <script>
   const firebaseConfig = {
     apiKey: "AIzaSyDir8gHZqsrExrIhF9nzBy4KbGINOuD2q8",
@@ -135,8 +136,8 @@
   const db = firebase.database();
 
   let manualPumpTimeout = null;
-  let runtimeClock = null;
   let runtimeUpdater = null;
+  let runtimeStartTime = null;
 
   function updateTime() {
     const now = new Date();
@@ -172,13 +173,12 @@
     }
   }
 
-  function startAccurateRuntimeTimer(startTimeStr) {
-    if (!startTimeStr) return;
-    runtimeClock = new Date(startTimeStr.replace(" ", "T") + "+09:00");
+  function startRuntimeTimerFromNow() {
+    runtimeStartTime = getKSTDate();
     stopRuntimeUpdater();
     runtimeUpdater = setInterval(() => {
       const now = getKSTDate();
-      const diff = Math.floor((now - runtimeClock) / 1000);
+      const diff = Math.floor((now - runtimeStartTime) / 1000);
       document.getElementById("pumpRuntime").innerText = diff;
     }, 1000);
   }
@@ -188,6 +188,7 @@
       clearInterval(runtimeUpdater);
       runtimeUpdater = null;
     }
+    runtimeStartTime = null;
   }
 
   function startMonitoring() {
@@ -214,24 +215,20 @@
       toggleBtn.style.backgroundColor = state ? "green" : "blue";
       toggleBtn.disabled = (modeSelect.value !== "manual");
 
+      if (state) {
+        startRuntimeTimerFromNow();
+      } else {
+        stopRuntimeUpdater();
+      }
+
       if (!state) {
         clearTimeout(manualPumpTimeout);
-        stopRuntimeUpdater();
       }
     });
 
     db.ref("pump/clock").on("value", snap => {
       const clock = snap.val();
       pumpTime.innerText = clock || "-";
-      if (clock) {
-        startAccurateRuntimeTimer(clock);
-      }
-    });
-
-    db.ref("pump/runtime").on("value", snap => {
-      if (!runtimeUpdater) {
-        pumpRuntime.innerText = snap.val() ?? 0;
-      }
     });
 
     db.ref("pump/type").on("value", snap => {
