@@ -100,8 +100,9 @@
     <p>습도: <span id="humi">-</span> %</p>
     <p>토양습도: <span id="soil">-</span></p>
     <p>펌프 상태: <span id="pumpStatus">-</span></p>
-    <p>마지막 작동 시각: <span id="pumpTime">-</span></p>
-    <p>작동 시간: <span id="pumpRuntime">-</span> 초</p>
+    <p>마지막 작동 시각: <span id="pumpOnTime">-</span></p>
+    <p>작동 종료 시각: <span id="pumpOffTime">-</span></p>
+    <p>총 작동 시간: <span id="pumpDuration">-</span> 초</p>
     <p>모드: 
       <select id="modeSelect">
         <option value="auto">자동</option>
@@ -121,7 +122,6 @@
 <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
 
-<!-- 전체 내용 동일, 아래 <script> 부분만 교체 -->
 <script>
   const firebaseConfig = {
     apiKey: "AIzaSyDir8gHZqsrExrIhF9nzBy4KbGINOuD2q8",
@@ -137,6 +137,8 @@
 
   let manualPumpTimeout = null;
   let runtimeUpdater = null;
+  let pumpOnTime = null;
+  let pumpOffTime = null;
 
   function updateTime() {
     const now = new Date();
@@ -152,38 +154,6 @@
     return new Date(now.getTime() + 9 * 60 * 60 * 1000);
   }
 
-  function updatePumpMeta(state) {
-    const now = getKSTDate();
-    const nowStr = now.toISOString().replace("T", " ").substring(0, 19);
-    db.ref("pump/clock").set(nowStr);
-    db.ref("pump/runtime").set(state ? 180 : 0);
-  }
-
-  // 경과 시간 타이머 시작: 펌프 작동 시작 시각 문자열(ISO) 기준
-  function startRuntimeTimerFromClock(clockStr) {
-    if (!clockStr) {
-      document.getElementById("pumpRuntime").innerText = "-";
-      return;
-    }
-    const startTime = new Date(clockStr);
-    stopRuntimeUpdater();
-
-    runtimeUpdater = setInterval(() => {
-      const now = getKSTDate();
-      const diff = Math.floor((now - startTime) / 1000);
-      document.getElementById("pumpRuntime").innerText = diff >= 0 ? diff : 0;
-    }, 1000);
-  }
-
-  // 경과 시간 타이머 중지
-  function stopRuntimeUpdater() {
-    if (runtimeUpdater) {
-      clearInterval(runtimeUpdater);
-      runtimeUpdater = null;
-    }
-    document.getElementById("pumpRuntime").innerText = "-";
-  }
-
   function updateUIByMode(mode) {
     const toggleBtn = document.getElementById("togglePump");
     if (mode === "manual") {
@@ -193,7 +163,20 @@
       toggleBtn.style.display = "none";
       toggleBtn.disabled = true;
       clearTimeout(manualPumpTimeout);
-      stopRuntimeUpdater();
+    }
+  }
+
+  function calculatePumpDuration() {
+    const durationSpan = document.getElementById("pumpDuration");
+    if (pumpOnTime && pumpOffTime) {
+      const diffSec = Math.floor((pumpOffTime - pumpOnTime) / 1000);
+      if (diffSec > 0) {
+        durationSpan.innerText = diffSec;
+      } else {
+        durationSpan.innerText = "-";
+      }
+    } else {
+      durationSpan.innerText = "-";
     }
   }
 
@@ -202,7 +185,8 @@
     const humi = document.getElementById("humi");
     const soil = document.getElementById("soil");
     const pumpStatus = document.getElementById("pumpStatus");
-    const pumpTime = document.getElementById("pumpTime");
+    const pumpOnTimeSpan = document.getElementById("pumpOnTime");
+    const pumpOffTimeSpan = document.getElementById("pumpOffTime");
     const toggleBtn = document.getElementById("togglePump");
     const modeSelect = document.getElementById("modeSelect");
 
@@ -220,25 +204,21 @@
       toggleBtn.style.backgroundColor = state ? "green" : "blue";
       toggleBtn.disabled = (modeSelect.value !== "manual");
 
+      const now = getKSTDate();
+      const nowStr = now.toISOString().replace("T", " ").substring(0, 19);
+
+      if (state) {
+        pumpOnTime = now;
+        pumpOnTimeSpan.innerText = nowStr;
+      } else {
+        pumpOffTime = now;
+        pumpOffTimeSpan.innerText = nowStr;
+        calculatePumpDuration();
+      }
+
       if (!state) {
-        stopRuntimeUpdater();
         clearTimeout(manualPumpTimeout);
       }
-    });
-
-    db.ref("pump/clock").on("value", snap => {
-      const clock = snap.val();
-      pumpTime.innerText = clock || "-";
-
-      // 펌프 상태 읽고 작동 중일 때만 경과 시간 타이머 시작
-      db.ref("pump/state").get().then(stateSnap => {
-        const state = stateSnap.val();
-        if (state) {
-          startRuntimeTimerFromClock(clock);
-        } else {
-          stopRuntimeUpdater();
-        }
-      });
     });
 
     db.ref("pump/type").on("value", snap => {
@@ -254,7 +234,6 @@
         const current = snap.val();
         const newState = !current;
         db.ref("pump/state").set(newState);
-        updatePumpMeta(newState);
 
         if (newState && modeSelect.value === "manual") {
           manualPumpTimeout = setTimeout(() => {
@@ -291,7 +270,6 @@
     firebase.auth().signOut().then(() => {
       document.getElementById("dashboard").style.display = "none";
       document.getElementById("loginForm").style.display = "block";
-      stopRuntimeUpdater();
       clearTimeout(manualPumpTimeout);
     });
   };
