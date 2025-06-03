@@ -79,7 +79,7 @@
 <h1>EX 스마트 관수 시스템</h1>
 <p id="currentTime">현재 시각 (KST): -</p>
 
-<div id="loginForm" style="display:none">
+<div id="loginForm">
   <input type="email" id="email" placeholder="이메일" required><br>
   <input type="password" id="password" placeholder="비밀번호" required><br>
   <button id="loginBtn">로그인</button>
@@ -128,7 +128,7 @@
   firebase.initializeApp(firebaseConfig);
   const db = firebase.database();
 
-  // 현재 KST 시간 표시
+  // KST 시간 표시
   function updateTime() {
     const now = new Date();
     const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
@@ -138,30 +138,38 @@
   setInterval(updateTime, 1000);
   updateTime();
 
+  // 로그인 상태 처리
   firebase.auth().onAuthStateChanged(user => {
     if (user) {
       document.getElementById("dashboard").style.display = "block";
       document.getElementById("loginForm").style.display = "none";
       startMonitoring();
     } else {
-      firebase.auth().signInAnonymously().catch(err => {
-        alert("익명 로그인 실패: " + err.message);
-      });
+      document.getElementById("dashboard").style.display = "none";
+      document.getElementById("loginForm").style.display = "block";
     }
   });
 
-  function getKSTTimeString() {
-    const now = new Date();
-    const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-    return kst.toTimeString().substring(0, 8);
-  }
+  // 로그인 버튼 이벤트
+  document.getElementById("loginBtn").onclick = () => {
+    const email = document.getElementById("email").value;
+    const password = document.getElementById("password").value;
 
-  function updatePumpMeta(newState) {
-    const timeNow = getKSTTimeString();
-    db.ref("pump/clock").set(timeNow);
-    db.ref("pump/runtime").set(newState ? 180 : 0);
-  }
+    firebase.auth().signInWithEmailAndPassword(email, password)
+      .then(() => {
+        // 로그인 성공
+      })
+      .catch(error => {
+        alert("로그인 실패: " + error.message);
+      });
+  };
 
+  // 로그아웃 버튼
+  document.getElementById("logoutBtn").onclick = () => {
+    firebase.auth().signOut();
+  };
+
+  // 데이터 실시간 모니터링
   function startMonitoring() {
     const temp = document.getElementById("temp");
     const humi = document.getElementById("humi");
@@ -219,16 +227,6 @@
       }
     });
 
-    function updateUIByMode(mode) {
-      if (mode === "auto") {
-        toggleBtn.style.display = "none";
-        toggleBtn.disabled = true;
-      } else if (mode === "manual") {
-        toggleBtn.style.display = "inline-block";
-        toggleBtn.disabled = false;
-      }
-    }
-
     toggleBtn.onclick = () => {
       db.ref("pump/state").get().then(snap => {
         const current = snap.val();
@@ -246,14 +244,26 @@
       updateUIByMode(selected);
     };
 
+    function updatePumpMeta(newState) {
+      const now = new Date();
+      const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+      const timeStr = kst.toTimeString().substring(0, 8);
+      db.ref("pump/clock").set(timeStr);
+      db.ref("pump/runtime").set(newState ? 180 : 0);
+    }
+
+    function updateUIByMode(mode) {
+      if (mode === "auto") {
+        toggleBtn.style.display = "none";
+        toggleBtn.disabled = true;
+      } else if (mode === "manual") {
+        toggleBtn.style.display = "inline-block";
+        toggleBtn.disabled = false;
+      }
+    }
+
     updateUIByMode(modeSelect.value);
   }
-
-  document.getElementById("logoutBtn").onclick = () => {
-    firebase.auth().signOut().then(() => {
-      document.getElementById("dashboard").style.display = "none";
-    });
-  };
 </script>
 
 </body>
