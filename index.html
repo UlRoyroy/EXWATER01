@@ -134,9 +134,9 @@
   firebase.initializeApp(firebaseConfig);
   const db = firebase.database();
 
-  let runtimeInterval = null;
   let manualPumpTimeout = null;
-  let currentRuntime = 0;
+  let runtimeClock = null;
+  let runtimeUpdater = null;
 
   function updateTime() {
     const now = new Date();
@@ -147,17 +147,16 @@
   setInterval(updateTime, 1000);
   updateTime();
 
-  function getKSTTimeString() {
+  function getKSTDate() {
     const now = new Date();
-    const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-    return kst.toISOString().replace("T", " ").substring(0, 19);
+    return new Date(now.getTime() + 9 * 60 * 60 * 1000);
   }
 
   function updatePumpMeta(state) {
-    const now = getKSTTimeString();
-    const runtime = state ? 180 : 0;
-    db.ref("pump/clock").set(now);
-    db.ref("pump/runtime").set(runtime);
+    const now = getKSTDate();
+    const nowStr = now.toISOString().replace("T", " ").substring(0, 19);
+    db.ref("pump/clock").set(nowStr);
+    db.ref("pump/runtime").set(state ? 180 : 0);
   }
 
   function updateUIByMode(mode) {
@@ -169,23 +168,26 @@
       toggleBtn.style.display = "none";
       toggleBtn.disabled = true;
       clearTimeout(manualPumpTimeout);
-      stopRuntimeTimer();
+      stopRuntimeUpdater();
     }
   }
 
-  function startRuntimeTimer() {
-    clearInterval(runtimeInterval);
-    currentRuntime = 0;
-    document.getElementById("pumpRuntime").innerText = currentRuntime;
-    runtimeInterval = setInterval(() => {
-      currentRuntime++;
-      document.getElementById("pumpRuntime").innerText = currentRuntime;
+  function startAccurateRuntimeTimer(startTimeStr) {
+    if (!startTimeStr) return;
+    runtimeClock = new Date(startTimeStr.replace(" ", "T") + "+09:00");
+    stopRuntimeUpdater();
+    runtimeUpdater = setInterval(() => {
+      const now = getKSTDate();
+      const diff = Math.floor((now - runtimeClock) / 1000);
+      document.getElementById("pumpRuntime").innerText = diff;
     }, 1000);
   }
 
-  function stopRuntimeTimer() {
-    clearInterval(runtimeInterval);
-    runtimeInterval = null;
+  function stopRuntimeUpdater() {
+    if (runtimeUpdater) {
+      clearInterval(runtimeUpdater);
+      runtimeUpdater = null;
+    }
   }
 
   function startMonitoring() {
@@ -212,25 +214,23 @@
       toggleBtn.style.backgroundColor = state ? "green" : "blue";
       toggleBtn.disabled = (modeSelect.value !== "manual");
 
-      if (state && modeSelect.value === "manual") {
-        startRuntimeTimer();
-      } else {
-        stopRuntimeTimer();
-      }
-
       if (!state) {
         clearTimeout(manualPumpTimeout);
+        stopRuntimeUpdater();
       }
     });
 
     db.ref("pump/clock").on("value", snap => {
-      pumpTime.innerText = snap.val() || "-";
+      const clock = snap.val();
+      pumpTime.innerText = clock || "-";
+      if (clock) {
+        startAccurateRuntimeTimer(clock);
+      }
     });
 
     db.ref("pump/runtime").on("value", snap => {
-      if (!runtimeInterval) {
-        currentRuntime = snap.val() ?? 0;
-        pumpRuntime.innerText = currentRuntime;
+      if (!runtimeUpdater) {
+        pumpRuntime.innerText = snap.val() ?? 0;
       }
     });
 
@@ -284,7 +284,7 @@
     firebase.auth().signOut().then(() => {
       document.getElementById("dashboard").style.display = "none";
       document.getElementById("loginForm").style.display = "block";
-      stopRuntimeTimer();
+      stopRuntimeUpdater();
       clearTimeout(manualPumpTimeout);
     });
   };
