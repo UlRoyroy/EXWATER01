@@ -117,7 +117,6 @@
   © 2025 EX 스마트 관수 시스템
 </footer>
 
-<!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
@@ -135,7 +134,10 @@
   firebase.initializeApp(firebaseConfig);
   const db = firebase.database();
 
-  // 시간 표시 (KST)
+  let runtimeInterval = null;
+  let manualPumpTimeout = null;
+  let currentRuntime = 0;
+
   function updateTime() {
     const now = new Date();
     const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
@@ -166,7 +168,21 @@
     } else {
       toggleBtn.style.display = "none";
       toggleBtn.disabled = true;
+      clearTimeout(manualPumpTimeout);
     }
+  }
+
+  function startRuntimeTimer() {
+    clearInterval(runtimeInterval);
+    runtimeInterval = setInterval(() => {
+      currentRuntime++;
+      document.getElementById("pumpRuntime").innerText = currentRuntime;
+    }, 1000);
+  }
+
+  function stopRuntimeTimer() {
+    clearInterval(runtimeInterval);
+    runtimeInterval = null;
   }
 
   function startMonitoring() {
@@ -192,6 +208,11 @@
       toggleBtn.innerText = state ? "펌프 끄기" : "펌프 켜기";
       toggleBtn.style.backgroundColor = state ? "green" : "blue";
       toggleBtn.disabled = (modeSelect.value !== "manual");
+
+      if (!state) {
+        clearTimeout(manualPumpTimeout);
+        stopRuntimeTimer();
+      }
     });
 
     db.ref("pump/clock").on("value", snap => {
@@ -199,7 +220,10 @@
     });
 
     db.ref("pump/runtime").on("value", snap => {
-      pumpRuntime.innerText = snap.val() ?? "-";
+      if (!runtimeInterval) {
+        currentRuntime = snap.val() ?? 0;
+        pumpRuntime.innerText = currentRuntime;
+      }
     });
 
     db.ref("pump/type").on("value", snap => {
@@ -216,6 +240,16 @@
         const newState = !current;
         db.ref("pump/state").set(newState);
         updatePumpMeta(newState);
+
+        if (newState && modeSelect.value === "manual") {
+          manualPumpTimeout = setTimeout(() => {
+            db.ref("pump/state").set(false);
+            db.ref("pump/type").set("auto");
+            alert("3분 경과: 펌프 OFF 및 자동모드 전환");
+          }, 180000); // 3분
+        } else {
+          clearTimeout(manualPumpTimeout);
+        }
       }).catch(err => alert("펌프 제어 실패: " + err.message));
     };
 
@@ -242,6 +276,8 @@
     firebase.auth().signOut().then(() => {
       document.getElementById("dashboard").style.display = "none";
       document.getElementById("loginForm").style.display = "block";
+      stopRuntimeTimer();
+      clearTimeout(manualPumpTimeout);
     });
   };
 
