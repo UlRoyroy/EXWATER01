@@ -148,12 +148,14 @@
   function getKSTTimeString() {
     const now = new Date();
     const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-    return kst.toTimeString().substring(0, 8);
+    return kst.toISOString().replace("T", " ").substring(0, 19);
   }
 
   function updatePumpMeta(state) {
-    db.ref("pump/clock").set(getKSTTimeString());
-    db.ref("pump/runtime").set(state ? 180 : 0);
+    const now = getKSTTimeString();
+    const runtime = state ? 180 : 0;
+    db.ref("pump/clock").set(now);
+    db.ref("pump/runtime").set(runtime);
   }
 
   function updateUIByMode(mode) {
@@ -224,7 +226,6 @@
     };
   }
 
-  // 로그인 로직
   document.getElementById("loginBtn").onclick = () => {
     const email = document.getElementById("email").value;
     const pw = document.getElementById("password").value;
@@ -244,7 +245,6 @@
     });
   };
 
-  // 로그인 유지 처리
   firebase.auth().onAuthStateChanged(user => {
     if (user) {
       document.getElementById("loginForm").style.display = "none";
