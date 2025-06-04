@@ -5,7 +5,54 @@
   <title>EX 스마트 관수 시스템</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    /* 스타일 생략 - 기존과 동일 */
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 20px;
+      background-color: #f3f3f3;
+    }
+
+    h1 {
+      color: #2c3e50;
+    }
+
+    .status-card {
+      background-color: white;
+      padding: 20px;
+      margin: 20px auto;
+      max-width: 400px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    }
+
+    button {
+      padding: 10px 20px;
+      margin-top: 10px;
+      border: none;
+      border-radius: 5px;
+      color: white;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      background-color: gray !important;
+      cursor: not-allowed;
+    }
+
+    #logoutBtn {
+      background-color: #e74c3c;
+    }
+
+    select {
+      padding: 5px;
+      margin-top: 5px;
+    }
+
+    footer {
+      margin-top: 30px;
+      font-size: 0.9em;
+      color: #777;
+    }
   </style>
 </head>
 <body>
@@ -62,23 +109,23 @@
   const db = firebase.database();
 
   let manualPumpTimeout = null;
+  let lastOntime = null;
+  let lastOfftime = null;
 
   function getKSTDate() {
-    return new Date(new Date().getTime() + 9 * 60 * 60 * 1000);
+    return new Date(Date.now() + 9 * 60 * 60 * 1000);
   }
 
   function formatDateTime(date) {
     return date.toISOString().replace("T", " ").substring(0, 19);
   }
 
-  function calculateAndDisplayRuntime(ontimeStr, offtimeStr) {
-    if (!ontimeStr || !offtimeStr) {
+  function calculateAndDisplayRuntime(on, off) {
+    if (!on || !off) {
       document.getElementById("pumpRuntime").innerText = "-";
       return;
     }
-    const onTime = new Date(ontimeStr);
-    const offTime = new Date(offtimeStr);
-    const duration = Math.floor((offTime - onTime) / 1000);
+    const duration = Math.floor((new Date(off) - new Date(on)) / 1000);
     document.getElementById("pumpRuntime").innerText = duration > 0 ? duration : "-";
   }
 
@@ -103,9 +150,6 @@
     const toggleBtn = document.getElementById("togglePump");
     const ontime = document.getElementById("ontime");
     const offtime = document.getElementById("offtime");
-
-    let lastOntime = null;
-    let lastOfftime = null;
 
     db.ref("sensor").on("value", snap => {
       const data = snap.val() || {};
@@ -132,17 +176,15 @@
       if (!state) clearTimeout(manualPumpTimeout);
     });
 
-    db.ref("pump/ontime").once("value").then(snap => {
-      const value = snap.val();
-      ontime.innerText = value || "-";
-      lastOntime = value;
+    db.ref("pump/ontime").on("value", snap => {
+      lastOntime = snap.val();
+      document.getElementById("ontime").innerText = lastOntime || "-";
       calculateAndDisplayRuntime(lastOntime, lastOfftime);
     });
 
-    db.ref("pump/offtime").once("value").then(snap => {
-      const value = snap.val();
-      offtime.innerText = value || "-";
-      lastOfftime = value;
+    db.ref("pump/offtime").on("value", snap => {
+      lastOfftime = snap.val();
+      document.getElementById("offtime").innerText = lastOfftime || "-";
       calculateAndDisplayRuntime(lastOntime, lastOfftime);
     });
 
@@ -160,6 +202,7 @@
           db.ref("pump/offtime").set(nowFormatted);
           lastOfftime = nowFormatted;
         }
+
         calculateAndDisplayRuntime(lastOntime, lastOfftime);
 
         if (newState && modeSelect.value === "manual") {
