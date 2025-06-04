@@ -109,140 +109,107 @@
   <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
 
-  <script>
-    const firebaseConfig = {
-      apiKey: "AIzaSyDir8gHZqsrExrIhF9nzBy4KbGINOuD2q8",
-      authDomain: "exwater01.firebaseapp.com",
-      databaseURL: "https://exwater01-default-rtdb.asia-southeast1.firebasedatabase.app",
-      projectId: "exwater01",
-      storageBucket: "exwater01.appspot.com",
-      messagingSenderId: "166996899021",
-      appId: "1:166996899021:web:c6ce758dc566dbc75b6584"
-    };
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
+<style>
+  /* 기존 스타일 유지 + 추가 항목 */
+  .pump-info {
+    margin-top: 10px;
+    font-weight: bold;
+  }
+</style>
+...
+<div class="status-card">
+  <h2>환경 정보</h2>
+  <p>온도: <span id="temp">-</span> ℃ | 습도: <span id="humi">-</span> % | 토양습도: <span id="soil">-</span></p>
+  <p class="pump-info">펌프: <span id="pumpType">-</span> | 상태: <span id="pumpStatus">-</span></p>
+  <p>ON 시간: <span id="ontime">-</span></p>
+  <p>OFF 시간: <span id="offtime">-</span></p>
+  <p>작동 시간: <span id="pumpRuntime">-</span> 초</p>
+  <button id="toggleModeBtn">모드 전환</button><br>
+  <button id="togglePump" style="display:none;" disabled>펌프 ON/OFF</button>
+</div>
+...
 
-    const loginBtn = document.getElementById("loginBtn");
-    const logoutBtn = document.getElementById("logoutBtn");
-    const loginForm = document.getElementById("loginForm");
-    const dashboard = document.getElementById("dashboard");
+<script>
+  const toggleModeBtn = document.getElementById("toggleModeBtn");
+  const togglePumpBtn = document.getElementById("togglePump");
+  let currentMode = "auto";
 
-    function updateTime() {
-      const now = new Date();
-      now.setHours(now.getHours() + 9); // KST
-      document.getElementById("currentTime").textContent = `현재 시각 (KST): ${now.toISOString().slice(0, 19).replace('T', ' ')}`;
+  function updateModeUI(mode) {
+    currentMode = mode;
+    document.getElementById("pumpType").textContent = (mode === "auto") ? "자동" : "수동";
+
+    // 모드 전환 버튼 텍스트
+    toggleModeBtn.textContent = (mode === "auto") ? "수동 모드로 전환" : "자동 모드로 전환";
+
+    // 펌프 조작 버튼은 수동 모드에서만 보임
+    if (mode === "manual") {
+      togglePumpBtn.style.display = "inline-block";
+      togglePumpBtn.disabled = false;
+    } else {
+      togglePumpBtn.style.display = "none";
     }
-    setInterval(updateTime, 1000);
-    updateTime();
+  }
 
-    loginBtn.addEventListener("click", () => {
-      const email = document.getElementById("email").value;
-      const password = document.getElementById("password").value;
-      firebase.auth().signInWithEmailAndPassword(email, password)
-        .then(() => {
-          loginForm.style.display = "none";
-          dashboard.style.display = "block";
-          initDashboard();
-        })
-        .catch(err => alert("로그인 실패: " + err.message));
-    });
+  toggleModeBtn.addEventListener("click", () => {
+    const nextMode = (currentMode === "auto") ? "manual" : "auto";
+    db.ref("/pump/type").set(nextMode);
+  });
 
-    logoutBtn.addEventListener("click", () => {
-      firebase.auth().signOut().then(() => {
-        loginForm.style.display = "block";
-        dashboard.style.display = "none";
-      });
-    });
+  togglePumpBtn.addEventListener("click", () => {
+    const ref = db.ref("/pump/state");
+    ref.once("value").then(snap => {
+      const current = snap.val();
+      const next = (current === "ON") ? "OFF" : "ON";
+      ref.set(next);
 
-    firebase.auth().onAuthStateChanged((user) => {
-      if (user) {
-        loginForm.style.display = "none";
-        dashboard.style.display = "block";
-        initDashboard();
+      const nowKST = new Date();
+      nowKST.setHours(nowKST.getHours() + 9);
+      const timeStr = nowKST.toISOString().slice(0, 19).replace('T', ' ');
+
+      if (next === "ON") {
+        db.ref("/pump/ontime").set(timeStr);
       } else {
-        loginForm.style.display = "block";
-        dashboard.style.display = "none";
+        db.ref("/pump/offtime").set(timeStr);
       }
     });
+  });
 
-    const autoBtn = document.getElementById("autoModeBtn");
-    const manualBtn = document.getElementById("manualModeBtn");
-
-    function updateModeUI(mode) {
-      if (mode === "auto") {
-        autoBtn.classList.add("active");
-        manualBtn.classList.remove("active");
-        document.getElementById("togglePump").style.display = "none";
-      } else {
-        manualBtn.classList.add("active");
-        autoBtn.classList.remove("active");
-        document.getElementById("togglePump").style.display = "inline-block";
-        document.getElementById("togglePump").disabled = false;
-      }
-    }
-
-    autoBtn.addEventListener("click", () => {
-      db.ref("/pump/type").set("auto");
+  function initDashboard() {
+    db.ref("/sensor/temperature").on("value", snap => {
+      document.getElementById("temp").textContent = snap.val();
     });
-    manualBtn.addEventListener("click", () => {
-      db.ref("/pump/type").set("manual");
+    db.ref("/sensor/humidity").on("value", snap => {
+      document.getElementById("humi").textContent = snap.val();
     });
-
-    document.getElementById("togglePump").addEventListener("click", () => {
-      const ref = db.ref("/pump/state");
-      ref.once("value").then(snap => {
-        const current = snap.val();
-        const next = (current === "ON") ? "OFF" : "ON";
-        ref.set(next);
-
-        const nowKST = new Date();
-        nowKST.setHours(nowKST.getHours() + 9);
-        const timeStr = nowKST.toISOString().slice(0, 19).replace('T', ' ');
-
-        if (next === "ON") {
-          db.ref("/pump/ontime").set(timeStr);
-        } else {
-          db.ref("/pump/offtime").set(timeStr);
-        }
-      });
+    db.ref("/sensor/moisture").on("value", snap => {
+      document.getElementById("soil").textContent = snap.val();
     });
+    db.ref("/pump/state").on("value", snap => {
+      document.getElementById("pumpStatus").textContent = snap.val();
+    });
+    db.ref("/pump/ontime").on("value", snap => {
+      const val = snap.val();
+      document.getElementById("ontime").textContent = val;
+      window._ontime = new Date(val.replace(' ', 'T') + '+09:00');
+      updateRuntimeDisplay();
+    });
+    db.ref("/pump/offtime").on("value", snap => {
+      const val = snap.val();
+      document.getElementById("offtime").textContent = val;
+      window._offtime = new Date(val.replace(' ', 'T') + '+09:00');
+      updateRuntimeDisplay();
+    });
+    db.ref("/pump/type").on("value", snap => {
+      updateModeUI(snap.val());
+    });
+  }
 
-    function initDashboard() {
-      db.ref("/sensor/temperature").on("value", snap => {
-        document.getElementById("temp").textContent = snap.val();
-      });
-      db.ref("/sensor/humidity").on("value", snap => {
-        document.getElementById("humi").textContent = snap.val();
-      });
-      db.ref("/sensor/moisture").on("value", snap => {
-        document.getElementById("soil").textContent = snap.val();
-      });
-      db.ref("/pump/state").on("value", snap => {
-        document.getElementById("pumpStatus").textContent = snap.val();
-      });
-      db.ref("/pump/ontime").on("value", snap => {
-        const val = snap.val();
-        document.getElementById("ontime").textContent = val;
-        window._ontime = new Date(val.replace(' ', 'T') + '+09:00');
-        updateRuntimeDisplay();
-      });
-      db.ref("/pump/offtime").on("value", snap => {
-        const val = snap.val();
-        document.getElementById("offtime").textContent = val;
-        window._offtime = new Date(val.replace(' ', 'T') + '+09:00');
-        updateRuntimeDisplay();
-      });
-      db.ref("/pump/type").on("value", snap => {
-        updateModeUI(snap.val());
-      });
+  function updateRuntimeDisplay() {
+    if (window._ontime && window._offtime) {
+      const diff = (window._offtime - window._ontime) / 1000;
+      document.getElementById("pumpRuntime").textContent = (diff > 0) ? Math.floor(diff) : "-";
     }
-
-    function updateRuntimeDisplay() {
-      if (window._ontime && window._offtime) {
-        const diff = (window._offtime - window._ontime) / 1000;
-        document.getElementById("pumpRuntime").textContent = (diff > 0) ? Math.floor(diff) : "-";
-      }
-    }
-  </script>
+  }
+</script>
 </body>
 </html>
