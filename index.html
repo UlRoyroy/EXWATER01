@@ -119,9 +119,7 @@
     <div id="dashboard" style="display:none">
       <div class="status-card">
         <h2>환경 정보</h2>
-        <p>온도: <span id="temp">-</span> ℃</p>
-        <p>습도: <span id="humi">-</span> %</p>
-        <p>토양습도: <span id="soil">-</span></p>
+        <p>온도: <span id="temp">-</span> ℃ &nbsp;|&nbsp; 습도: <span id="humi">-</span> % &nbsp;|&nbsp; 토양습도: <span id="soil">-</span></p>
         <p>펌프 상태: <span id="pumpStatus">-</span></p>
         <p>ON 시간: <span id="ontime">-</span></p>
         <p>OFF 시간: <span id="offtime">-</span></p>
@@ -146,38 +144,125 @@
   <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
 
-  <!-- JavaScript 코드 -->
+  <!-- Firebase 설정 및 기능 구현 -->
   <script>
-    // 로그인, 로그아웃, 실시간 정보 표시 등은 기존 코드 유지
+    // Firebase 설정 (실제 값 적용)
+    const firebaseConfig = {
+      apiKey: "AIzaSyCUQCgxP0lhJ35hWgrWyW6L3GHNR8gRf5Y",
+      authDomain: "exsmart-irrigation.firebaseapp.com",
+      databaseURL: "https://exsmart-irrigation-default-rtdb.firebaseio.com",
+      projectId: "exsmart-irrigation",
+      storageBucket: "exsmart-irrigation.appspot.com",
+      messagingSenderId: "361940685440",
+      appId: "1:361940685440:web:c4fe4002c46e37a6bc3d8a"
+    };
+    firebase.initializeApp(firebaseConfig);
 
-    // 모드 전환 버튼 토글 구현
+    const loginBtn = document.getElementById("loginBtn");
+    const logoutBtn = document.getElementById("logoutBtn");
+    const loginForm = document.getElementById("loginForm");
+    const dashboard = document.getElementById("dashboard");
+
+    loginBtn.addEventListener("click", () => {
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+
+      firebase.auth().signInWithEmailAndPassword(email, password)
+        .then(() => {
+          loginForm.style.display = "none";
+          dashboard.style.display = "block";
+        })
+        .catch((error) => {
+          alert("로그인 실패: " + error.message);
+        });
+    });
+
+    logoutBtn.addEventListener("click", () => {
+      firebase.auth().signOut().then(() => {
+        loginForm.style.display = "block";
+        dashboard.style.display = "none";
+      });
+    });
+
+    firebase.auth().onAuthStateChanged((user) => {
+      if (user) {
+        loginForm.style.display = "none";
+        dashboard.style.display = "block";
+      } else {
+        loginForm.style.display = "block";
+        dashboard.style.display = "none";
+      }
+    });
+
+    // 실시간 시각 표시
+    function updateTime() {
+      const now = new Date();
+      now.setHours(now.getHours() + 9); // KST
+      document.getElementById("currentTime").textContent = `현재 시각 (KST): ${now.toISOString().slice(0, 19).replace('T', ' ')}`;
+    }
+    setInterval(updateTime, 1000);
+    updateTime();
+
+    // 데이터베이스 실시간 반영
+    firebase.database().ref("/sensor/temperature").on("value", snap => {
+      document.getElementById("temp").textContent = snap.val();
+    });
+    firebase.database().ref("/sensor/humidity").on("value", snap => {
+      document.getElementById("humi").textContent = snap.val();
+    });
+    firebase.database().ref("/sensor/moisture").on("value", snap => {
+      document.getElementById("soil").textContent = snap.val();
+    });
+    firebase.database().ref("/PUMP/STATE").on("value", snap => {
+      document.getElementById("pumpStatus").textContent = snap.val();
+    });
+    firebase.database().ref("/PUMP/ontime").on("value", snap => {
+      document.getElementById("ontime").textContent = snap.val();
+    });
+    firebase.database().ref("/PUMP/offtime").on("value", snap => {
+      document.getElementById("offtime").textContent = snap.val();
+    });
+    firebase.database().ref("/PUMP/runtime").on("value", snap => {
+      document.getElementById("pumpRuntime").textContent = snap.val();
+    });
+
+    // 모드 토글 버튼
     const autoBtn = document.getElementById("autoModeBtn");
     const manualBtn = document.getElementById("manualModeBtn");
 
-    function updateModeUI(currentMode) {
-      if (currentMode === "auto") {
+    function updateModeUI(mode) {
+      if (mode === "auto") {
         autoBtn.classList.add("active");
         manualBtn.classList.remove("active");
+        document.getElementById("togglePump").style.display = "none";
       } else {
         manualBtn.classList.add("active");
         autoBtn.classList.remove("active");
+        document.getElementById("togglePump").style.display = "inline-block";
+        document.getElementById("togglePump").disabled = false;
       }
     }
 
     autoBtn.addEventListener("click", () => {
       firebase.database().ref("/PUMP/MODE").set("auto");
-      updateModeUI("auto");
     });
 
     manualBtn.addEventListener("click", () => {
       firebase.database().ref("/PUMP/MODE").set("manual");
-      updateModeUI("manual");
     });
 
-    // Firebase에서 모드 값을 감지해 UI 동기화
-    firebase.database().ref("/PUMP/MODE").on("value", (snapshot) => {
-      const mode = snapshot.val();
-      updateModeUI(mode);
+    firebase.database().ref("/PUMP/MODE").on("value", snap => {
+      updateModeUI(snap.val());
+    });
+
+    // 펌프 토글 버튼 기능 (수동 모드일 때만 사용 가능)
+    document.getElementById("togglePump").addEventListener("click", () => {
+      const ref = firebase.database().ref("/PUMP/STATE");
+      ref.once("value").then(snap => {
+        const current = snap.val();
+        const next = (current === "ON") ? "OFF" : "ON";
+        ref.set(next);
+      });
     });
   </script>
 </body>
