@@ -159,7 +159,9 @@
       const ref = db.ref("/pump/state");
       ref.once("value").then(snap => {
         const current = snap.val();
-        const next = (current === "ON") ? "OFF" : "ON";
+        // true/false인 경우 ON/OFF 문자열로 변환
+        const currentState = (typeof current === "boolean") ? (current ? "ON" : "OFF") : current;
+        const next = (currentState === "ON") ? "OFF" : "ON";
         ref.set(next);
 
         const nowKST = new Date();
@@ -184,9 +186,20 @@
       db.ref("/sensor/moisture").on("value", snap => {
         document.getElementById("soil").textContent = snap.val();
       });
+
       db.ref("/pump/state").on("value", snap => {
-        document.getElementById("pumpStatus").textContent = snap.val();
+        const val = snap.val();
+        let displayVal;
+        if (typeof val === "boolean") {
+          displayVal = val ? "ON" : "OFF";
+        } else if (typeof val === "string") {
+          displayVal = val.toUpperCase();
+        } else {
+          displayVal = "-";
+        }
+        document.getElementById("pumpStatus").textContent = displayVal;
       });
+
       db.ref("/pump/ontime").on("value", snap => {
         const val = snap.val();
         document.getElementById("ontime").textContent = val;
