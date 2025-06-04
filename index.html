@@ -213,16 +213,16 @@
     firebase.database().ref("/sensor/moisture").on("value", snap => {
       document.getElementById("soil").textContent = snap.val();
     });
-    firebase.database().ref("/PUMP/STATE").on("value", snap => {
+    firebase.database().ref("/pump/state").on("value", snap => {
       document.getElementById("pumpStatus").textContent = snap.val();
     });
-    firebase.database().ref("/PUMP/ontime").on("value", snap => {
+    firebase.database().ref("/pump/ontime").on("value", snap => {
       document.getElementById("ontime").textContent = snap.val();
     });
-    firebase.database().ref("/PUMP/offtime").on("value", snap => {
+    firebase.database().ref("/pump/offtime").on("value", snap => {
       document.getElementById("offtime").textContent = snap.val();
     });
-    firebase.database().ref("/PUMP/runtime").on("value", snap => {
+    firebase.database().ref("/pump/runtime").on("value", snap => {
       document.getElementById("pumpRuntime").textContent = snap.val();
     });
 
@@ -244,20 +244,20 @@
     }
 
     autoBtn.addEventListener("click", () => {
-      firebase.database().ref("/PUMP/MODE").set("auto");
+      firebase.database().ref("/pump/type").set("auto");
     });
 
     manualBtn.addEventListener("click", () => {
-      firebase.database().ref("/PUMP/MODE").set("manual");
+      firebase.database().ref("/pump/type").set("manual");
     });
 
-    firebase.database().ref("/PUMP/MODE").on("value", snap => {
+    firebase.database().ref("/pump/type").on("value", snap => {
       updateModeUI(snap.val());
     });
 
     // 펌프 토글 버튼 기능 (수동 모드일 때만 사용 가능)
     document.getElementById("togglePump").addEventListener("click", () => {
-      const ref = firebase.database().ref("/PUMP/STATE");
+      const ref = firebase.database().ref("/pump/state");
       ref.once("value").then(snap => {
         const current = snap.val();
         const next = (current === "ON") ? "OFF" : "ON";
