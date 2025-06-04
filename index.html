@@ -1,11 +1,73 @@
 <!DOCTYPE html>
-<html>
+<html lang="ko">
 <head>
   <meta charset="UTF-8" />
   <title>EX 스마트 관수 시스템</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    /* [중략] 기존 CSS 동일하므로 생략 */
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f4f7f9;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    .center-container {
+      width: 90%;
+      max-width: 500px;
+      text-align: center;
+    }
+
+    h1 {
+      color: #2c3e50;
+    }
+
+    input, button {
+      width: 80%;
+      padding: 10px;
+      margin: 5px auto;
+      font-size: 16px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
+
+    button {
+      background-color: #3498db;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #2980b9;
+    }
+
+    .status-card {
+      background-color: white;
+      border-radius: 12px;
+      padding: 20px;
+      margin: 20px 0;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .mode-toggle button {
+      width: 45%;
+      margin: 5px 2%;
+    }
+
+    .active {
+      background-color: #2ecc71 !important;
+    }
+
+    footer {
+      margin-top: 30px;
+      font-size: 12px;
+      color: #888;
+    }
   </style>
 </head>
 <body>
@@ -22,7 +84,7 @@
     <div id="dashboard" style="display:none">
       <div class="status-card">
         <h2>환경 정보</h2>
-        <p>온도: <span id="temp">-</span> ℃ &nbsp;|&nbsp; 습도: <span id="humi">-</span> % &nbsp;|&nbsp; 토양습도: <span id="soil">-</span></p>
+        <p>온도: <span id="temp">-</span> ℃ | 습도: <span id="humi">-</span> % | 토양습도: <span id="soil">-</span></p>
         <p>펌프 상태: <span id="pumpStatus">-</span></p>
         <p>ON 시간: <span id="ontime">-</span></p>
         <p>OFF 시간: <span id="offtime">-</span></p>
@@ -58,23 +120,21 @@
       appId: "1:166996899021:web:c6ce758dc566dbc75b6584"
     };
     firebase.initializeApp(firebaseConfig);
-
     const db = firebase.database();
+
     const loginBtn = document.getElementById("loginBtn");
     const logoutBtn = document.getElementById("logoutBtn");
     const loginForm = document.getElementById("loginForm");
     const dashboard = document.getElementById("dashboard");
 
-    // 현재 시각 출력
     function updateTime() {
       const now = new Date();
-      now.setHours(now.getHours() + 9); // KST 보정
+      now.setHours(now.getHours() + 9); // KST
       document.getElementById("currentTime").textContent = `현재 시각 (KST): ${now.toISOString().slice(0, 19).replace('T', ' ')}`;
     }
     setInterval(updateTime, 1000);
     updateTime();
 
-    // 로그인/로그아웃 처리
     loginBtn.addEventListener("click", () => {
       const email = document.getElementById("email").value;
       const password = document.getElementById("password").value;
@@ -82,7 +142,7 @@
         .then(() => {
           loginForm.style.display = "none";
           dashboard.style.display = "block";
-          initDashboard(); // 로그인 성공 시 데이터 로딩
+          initDashboard();
         })
         .catch(err => alert("로그인 실패: " + err.message));
     });
@@ -98,16 +158,16 @@
       if (user) {
         loginForm.style.display = "none";
         dashboard.style.display = "block";
-        initDashboard(); // 자동 로그인 시 대시보드 초기화
+        initDashboard();
       } else {
         loginForm.style.display = "block";
         dashboard.style.display = "none";
       }
     });
 
-    // 모드 전환 UI
     const autoBtn = document.getElementById("autoModeBtn");
     const manualBtn = document.getElementById("manualModeBtn");
+
     function updateModeUI(mode) {
       if (mode === "auto") {
         autoBtn.classList.add("active");
@@ -124,12 +184,10 @@
     autoBtn.addEventListener("click", () => {
       db.ref("/pump/type").set("auto");
     });
-
     manualBtn.addEventListener("click", () => {
       db.ref("/pump/type").set("manual");
     });
 
-    // 펌프 토글
     document.getElementById("togglePump").addEventListener("click", () => {
       const ref = db.ref("/pump/state");
       ref.once("value").then(snap => {
@@ -149,7 +207,6 @@
       });
     });
 
-    // 실시간 데이터 구독
     function initDashboard() {
       db.ref("/sensor/temperature").on("value", snap => {
         document.getElementById("temp").textContent = snap.val();
@@ -164,17 +221,27 @@
         document.getElementById("pumpStatus").textContent = snap.val();
       });
       db.ref("/pump/ontime").on("value", snap => {
-        document.getElementById("ontime").textContent = snap.val();
+        const val = snap.val();
+        document.getElementById("ontime").textContent = val;
+        window._ontime = new Date(val.replace(' ', 'T') + '+09:00');
+        updateRuntimeDisplay();
       });
       db.ref("/pump/offtime").on("value", snap => {
-        document.getElementById("offtime").textContent = snap.val();
-      });
-      db.ref("/pump/runtime").on("value", snap => {
-        document.getElementById("pumpRuntime").textContent = snap.val();
+        const val = snap.val();
+        document.getElementById("offtime").textContent = val;
+        window._offtime = new Date(val.replace(' ', 'T') + '+09:00');
+        updateRuntimeDisplay();
       });
       db.ref("/pump/type").on("value", snap => {
         updateModeUI(snap.val());
       });
+    }
+
+    function updateRuntimeDisplay() {
+      if (window._ontime && window._offtime) {
+        const diff = (window._offtime - window._ontime) / 1000;
+        document.getElementById("pumpRuntime").textContent = (diff > 0) ? Math.floor(diff) : "-";
+      }
     }
   </script>
 </body>
