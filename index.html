@@ -5,104 +5,7 @@
   <title>EX 스마트 관수 시스템</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background-color: #f3f3f3;
-      margin: 0;
-      height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      flex-direction: column;
-      text-align: center;
-    }
-
-    .center-container {
-      width: 100%;
-      max-width: 500px;
-      padding: 20px;
-    }
-
-    h1 {
-      color: #2c3e50;
-    }
-
-    .status-card {
-      background-color: white;
-      padding: 20px;
-      margin: 20px 0;
-      border-radius: 10px;
-      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-    }
-
-    button {
-      padding: 12px 20px;
-      margin-top: 10px;
-      margin-bottom: 5px;
-      border: none;
-      border-radius: 5px;
-      background-color: #3498db;
-      color: white;
-      font-size: 1em;
-      cursor: pointer;
-      transition: background-color 0.3s;
-    }
-
-    button:hover {
-      background-color: #2980b9;
-    }
-
-    button:disabled {
-      background-color: gray !important;
-      cursor: not-allowed;
-    }
-
-    #logoutBtn {
-      background-color: #e74c3c;
-    }
-
-    .mode-toggle {
-      display: flex;
-      justify-content: center;
-      margin-top: 10px;
-      gap: 10px;
-    }
-
-    .mode-toggle button {
-      flex: 1;
-      background-color: #bdc3c7;
-    }
-
-    .mode-toggle .active {
-      background-color: #27ae60 !important;
-    }
-
-    footer {
-      margin-top: 30px;
-      font-size: 0.9em;
-      color: #777;
-    }
-
-    input[type="email"],
-    input[type="password"] {
-      width: 100%;
-      padding: 12px;
-      margin-top: 10px;
-      font-size: 1em;
-      box-sizing: border-box;
-      border: 1px solid #ccc;
-      border-radius: 5px;
-    }
-
-    #loginForm {
-      margin-top: 20px;
-    }
-
-    @media (max-width: 600px) {
-      .center-container {
-        padding: 10px;
-      }
-    }
+    /* [중략] 기존 CSS 동일하므로 생략 */
   </style>
 </head>
 <body>
@@ -144,37 +47,44 @@
   <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
 
-  <!-- Firebase 설정 및 기능 구현 -->
   <script>
-    // Firebase 설정 (실제 값 적용)
     const firebaseConfig = {
       apiKey: "AIzaSyDir8gHZqsrExrIhF9nzBy4KbGINOuD2q8",
       authDomain: "exwater01.firebaseapp.com",
       databaseURL: "https://exwater01-default-rtdb.asia-southeast1.firebasedatabase.app",
       projectId: "exwater01",
-      storageBucket: "exwater01.firebasestorage.app",
+      storageBucket: "exwater01.appspot.com",
       messagingSenderId: "166996899021",
       appId: "1:166996899021:web:c6ce758dc566dbc75b6584"
     };
     firebase.initializeApp(firebaseConfig);
 
+    const db = firebase.database();
     const loginBtn = document.getElementById("loginBtn");
     const logoutBtn = document.getElementById("logoutBtn");
     const loginForm = document.getElementById("loginForm");
     const dashboard = document.getElementById("dashboard");
 
+    // 현재 시각 출력
+    function updateTime() {
+      const now = new Date();
+      now.setHours(now.getHours() + 9); // KST 보정
+      document.getElementById("currentTime").textContent = `현재 시각 (KST): ${now.toISOString().slice(0, 19).replace('T', ' ')}`;
+    }
+    setInterval(updateTime, 1000);
+    updateTime();
+
+    // 로그인/로그아웃 처리
     loginBtn.addEventListener("click", () => {
       const email = document.getElementById("email").value;
       const password = document.getElementById("password").value;
-
       firebase.auth().signInWithEmailAndPassword(email, password)
         .then(() => {
           loginForm.style.display = "none";
           dashboard.style.display = "block";
+          initDashboard(); // 로그인 성공 시 데이터 로딩
         })
-        .catch((error) => {
-          alert("로그인 실패: " + error.message);
-        });
+        .catch(err => alert("로그인 실패: " + err.message));
     });
 
     logoutBtn.addEventListener("click", () => {
@@ -188,48 +98,16 @@
       if (user) {
         loginForm.style.display = "none";
         dashboard.style.display = "block";
+        initDashboard(); // 자동 로그인 시 대시보드 초기화
       } else {
         loginForm.style.display = "block";
         dashboard.style.display = "none";
       }
     });
 
-    // 실시간 시각 표시
-    function updateTime() {
-      const now = new Date();
-      now.setHours(now.getHours() + 9); // KST
-      document.getElementById("currentTime").textContent = `현재 시각 (KST): ${now.toISOString().slice(0, 19).replace('T', ' ')}`;
-    }
-    setInterval(updateTime, 1000);
-    updateTime();
-
-    // 데이터베이스 실시간 반영
-    firebase.database().ref("/sensor/temperature").on("value", snap => {
-      document.getElementById("temp").textContent = snap.val();
-    });
-    firebase.database().ref("/sensor/humidity").on("value", snap => {
-      document.getElementById("humi").textContent = snap.val();
-    });
-    firebase.database().ref("/sensor/moisture").on("value", snap => {
-      document.getElementById("soil").textContent = snap.val();
-    });
-    firebase.database().ref("/pump/state").on("value", snap => {
-      document.getElementById("pumpStatus").textContent = snap.val();
-    });
-    firebase.database().ref("/pump/ontime").on("value", snap => {
-      document.getElementById("ontime").textContent = snap.val();
-    });
-    firebase.database().ref("/pump/offtime").on("value", snap => {
-      document.getElementById("offtime").textContent = snap.val();
-    });
-    firebase.database().ref("/pump/runtime").on("value", snap => {
-      document.getElementById("pumpRuntime").textContent = snap.val();
-    });
-
-    // 모드 토글 버튼
+    // 모드 전환 UI
     const autoBtn = document.getElementById("autoModeBtn");
     const manualBtn = document.getElementById("manualModeBtn");
-
     function updateModeUI(mode) {
       if (mode === "auto") {
         autoBtn.classList.add("active");
@@ -244,26 +122,60 @@
     }
 
     autoBtn.addEventListener("click", () => {
-      firebase.database().ref("/pump/type").set("auto");
+      db.ref("/pump/type").set("auto");
     });
 
     manualBtn.addEventListener("click", () => {
-      firebase.database().ref("/pump/type").set("manual");
+      db.ref("/pump/type").set("manual");
     });
 
-    firebase.database().ref("/pump/type").on("value", snap => {
-      updateModeUI(snap.val());
-    });
-
-    // 펌프 토글 버튼 기능 (수동 모드일 때만 사용 가능)
+    // 펌프 토글
     document.getElementById("togglePump").addEventListener("click", () => {
-      const ref = firebase.database().ref("/pump/state");
+      const ref = db.ref("/pump/state");
       ref.once("value").then(snap => {
         const current = snap.val();
         const next = (current === "ON") ? "OFF" : "ON";
         ref.set(next);
+
+        const nowKST = new Date();
+        nowKST.setHours(nowKST.getHours() + 9);
+        const timeStr = nowKST.toISOString().slice(0, 19).replace('T', ' ');
+
+        if (next === "ON") {
+          db.ref("/pump/ontime").set(timeStr);
+        } else {
+          db.ref("/pump/offtime").set(timeStr);
+        }
       });
     });
+
+    // 실시간 데이터 구독
+    function initDashboard() {
+      db.ref("/sensor/temperature").on("value", snap => {
+        document.getElementById("temp").textContent = snap.val();
+      });
+      db.ref("/sensor/humidity").on("value", snap => {
+        document.getElementById("humi").textContent = snap.val();
+      });
+      db.ref("/sensor/moisture").on("value", snap => {
+        document.getElementById("soil").textContent = snap.val();
+      });
+      db.ref("/pump/state").on("value", snap => {
+        document.getElementById("pumpStatus").textContent = snap.val();
+      });
+      db.ref("/pump/ontime").on("value", snap => {
+        document.getElementById("ontime").textContent = snap.val();
+      });
+      db.ref("/pump/offtime").on("value", snap => {
+        document.getElementById("offtime").textContent = snap.val();
+      });
+      db.ref("/pump/runtime").on("value", snap => {
+        document.getElementById("pumpRuntime").textContent = snap.val();
+      });
+      db.ref("/pump/type").on("value", snap => {
+        updateModeUI(snap.val());
+      });
+    }
   </script>
 </body>
 </html>
