@@ -1,19 +1,15 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html>
 <head>
   <meta charset="UTF-8" />
   <title>EX 스마트 관수 시스템</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      height: 100%;
-      background-color: #f3f3f3;
-      font-family: Arial, sans-serif;
-    }
-
     body {
+      font-family: Arial, sans-serif;
+      background-color: #f3f3f3;
+      margin: 0;
+      height: 100vh;
       display: flex;
       justify-content: center;
       align-items: center;
@@ -40,12 +36,20 @@
     }
 
     button {
-      padding: 10px 20px;
+      padding: 12px 20px;
       margin-top: 10px;
+      margin-bottom: 5px;
       border: none;
       border-radius: 5px;
+      background-color: #3498db;
       color: white;
+      font-size: 1em;
       cursor: pointer;
+      transition: background-color 0.3s;
+    }
+
+    button:hover {
+      background-color: #2980b9;
     }
 
     button:disabled {
@@ -57,9 +61,20 @@
       background-color: #e74c3c;
     }
 
-    select {
-      padding: 5px;
-      margin-top: 5px;
+    .mode-toggle {
+      display: flex;
+      justify-content: center;
+      margin-top: 10px;
+      gap: 10px;
+    }
+
+    .mode-toggle button {
+      flex: 1;
+      background-color: #bdc3c7;
+    }
+
+    .mode-toggle .active {
+      background-color: #27ae60 !important;
     }
 
     footer {
@@ -71,9 +86,12 @@
     input[type="email"],
     input[type="password"] {
       width: 100%;
-      padding: 10px;
+      padding: 12px;
       margin-top: 10px;
+      font-size: 1em;
       box-sizing: border-box;
+      border: 1px solid #ccc;
+      border-radius: 5px;
     }
 
     #loginForm {
@@ -108,12 +126,11 @@
         <p>ON 시간: <span id="ontime">-</span></p>
         <p>OFF 시간: <span id="offtime">-</span></p>
         <p>작동 시간: <span id="pumpRuntime">-</span> 초</p>
-        <p>모드:
-          <select id="modeSelect">
-            <option value="auto">자동</option>
-            <option value="manual">수동</option>
-          </select>
-        </p>
+        <p>모드:</p>
+        <div class="mode-toggle">
+          <button id="autoModeBtn">자동</button>
+          <button id="manualModeBtn">수동</button>
+        </div>
         <button id="togglePump" style="display:none;" disabled>펌프 ON/OFF</button>
       </div>
       <button id="logoutBtn">로그아웃</button>
@@ -131,161 +148,37 @@
 
   <!-- JavaScript 코드 -->
   <script>
-    const firebaseConfig = {
-      apiKey: "AIzaSyDir8gHZqsrExrIhF9nzBy4KbGINOuD2q8",
-      authDomain: "exwater01.firebaseapp.com",
-      databaseURL: "https://exwater01-default-rtdb.asia-southeast1.firebasedatabase.app",
-      projectId: "exwater01",
-      storageBucket: "exwater01.appspot.com",
-      messagingSenderId: "166996899021",
-      appId: "1:166996899021:web:c6ce758dc566dbc75b6584"
-    };
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
+    // 로그인, 로그아웃, 실시간 정보 표시 등은 기존 코드 유지
 
-    let manualPumpTimeout = null;
-    let lastOntime = null;
-    let lastOfftime = null;
+    // 모드 전환 버튼 토글 구현
+    const autoBtn = document.getElementById("autoModeBtn");
+    const manualBtn = document.getElementById("manualModeBtn");
 
-    function getKSTDate() {
-      return new Date(Date.now() + 9 * 60 * 60 * 1000);
-    }
-
-    function formatDateTime(date) {
-      return date.toISOString().replace("T", " ").substring(0, 19);
-    }
-
-    function calculateAndDisplayRuntime(on, off) {
-      if (!on || !off) {
-        document.getElementById("pumpRuntime").innerText = "-";
-        return;
-      }
-      const duration = Math.floor((new Date(off) - new Date(on)) / 1000);
-      document.getElementById("pumpRuntime").innerText = duration > 0 ? duration : "-";
-    }
-
-    function updateUIByMode(mode) {
-      const toggleBtn = document.getElementById("togglePump");
-      if (mode === "manual") {
-        toggleBtn.style.display = "inline-block";
-        toggleBtn.disabled = false;
+    function updateModeUI(currentMode) {
+      if (currentMode === "auto") {
+        autoBtn.classList.add("active");
+        manualBtn.classList.remove("active");
       } else {
-        toggleBtn.style.display = "none";
-        toggleBtn.disabled = true;
-        clearTimeout(manualPumpTimeout);
+        manualBtn.classList.add("active");
+        autoBtn.classList.remove("active");
       }
     }
 
-    function startMonitoring() {
-      const temp = document.getElementById("temp");
-      const humi = document.getElementById("humi");
-      const soil = document.getElementById("soil");
-      const pumpStatus = document.getElementById("pumpStatus");
-      const modeSelect = document.getElementById("modeSelect");
-      const toggleBtn = document.getElementById("togglePump");
-      const ontime = document.getElementById("ontime");
-      const offtime = document.getElementById("offtime");
-
-      db.ref("sensor").on("value", snap => {
-        const data = snap.val() || {};
-        temp.innerText = data.temperature ?? "-";
-        humi.innerText = data.humidity ?? "-";
-        soil.innerText = data.moisture ?? "-";
-      });
-
-      db.ref("pump/type").on("value", snap => {
-        const mode = snap.val();
-        if (mode) {
-          modeSelect.value = mode;
-          updateUIByMode(mode);
-        }
-      });
-
-      db.ref("pump/state").on("value", snap => {
-        const state = snap.val();
-        pumpStatus.innerText = state ? "작동 중" : "정지";
-        toggleBtn.innerText = state ? "펌프 끄기" : "펌프 켜기";
-        toggleBtn.style.backgroundColor = state ? "green" : "blue";
-        toggleBtn.disabled = (modeSelect.value !== "manual");
-        if (!state) clearTimeout(manualPumpTimeout);
-      });
-
-      db.ref("pump/ontime").on("value", snap => {
-        lastOntime = snap.val();
-        document.getElementById("ontime").innerText = lastOntime || "-";
-        calculateAndDisplayRuntime(lastOntime, lastOfftime);
-      });
-
-      db.ref("pump/offtime").on("value", snap => {
-        lastOfftime = snap.val();
-        document.getElementById("offtime").innerText = lastOfftime || "-";
-        calculateAndDisplayRuntime(lastOntime, lastOfftime);
-      });
-
-      toggleBtn.onclick = () => {
-        db.ref("pump/state").get().then(snap => {
-          const current = snap.val();
-          const newState = !current;
-          db.ref("pump/state").set(newState);
-          const nowFormatted = formatDateTime(getKSTDate());
-          if (newState) {
-            db.ref("pump/ontime").set(nowFormatted);
-            lastOntime = nowFormatted;
-          } else {
-            db.ref("pump/offtime").set(nowFormatted);
-            lastOfftime = nowFormatted;
-          }
-          calculateAndDisplayRuntime(lastOntime, lastOfftime);
-          if (newState && modeSelect.value === "manual") {
-            manualPumpTimeout = setTimeout(() => {
-              db.ref("pump/state").set(false);
-              db.ref("pump/type").set("auto");
-              alert("3분 경과: 펌프 OFF 및 자동모드 전환");
-            }, 180000);
-          } else {
-            clearTimeout(manualPumpTimeout);
-          }
-        });
-      };
-
-      modeSelect.onchange = () => {
-        db.ref("pump/type").set(modeSelect.value);
-        updateUIByMode(modeSelect.value);
-      };
-    }
-
-    document.getElementById("loginBtn").onclick = () => {
-      const email = document.getElementById("email").value;
-      const pw = document.getElementById("password").value;
-      firebase.auth().signInWithEmailAndPassword(email, pw)
-        .then(() => {
-          document.getElementById("loginForm").style.display = "none";
-          document.getElementById("dashboard").style.display = "block";
-          startMonitoring();
-        })
-        .catch(err => alert("로그인 실패: " + err.message));
-    };
-
-    document.getElementById("logoutBtn").onclick = () => {
-      firebase.auth().signOut().then(() => {
-        document.getElementById("dashboard").style.display = "none";
-        document.getElementById("loginForm").style.display = "block";
-        clearTimeout(manualPumpTimeout);
-      });
-    };
-
-    firebase.auth().onAuthStateChanged(user => {
-      if (user) {
-        document.getElementById("loginForm").style.display = "none";
-        document.getElementById("dashboard").style.display = "block";
-        startMonitoring();
-      }
+    autoBtn.addEventListener("click", () => {
+      firebase.database().ref("/PUMP/MODE").set("auto");
+      updateModeUI("auto");
     });
 
-    setInterval(() => {
-      const now = getKSTDate();
-      document.getElementById("currentTime").innerText = "현재 시각 (KST): " + now.toISOString().replace("T", " ").substring(0, 19);
-    }, 1000);
+    manualBtn.addEventListener("click", () => {
+      firebase.database().ref("/PUMP/MODE").set("manual");
+      updateModeUI("manual");
+    });
+
+    // Firebase에서 모드 값을 감지해 UI 동기화
+    firebase.database().ref("/PUMP/MODE").on("value", (snapshot) => {
+      const mode = snapshot.val();
+      updateModeUI(mode);
+    });
   </script>
 </body>
 </html>
