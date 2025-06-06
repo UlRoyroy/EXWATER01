@@ -159,7 +159,7 @@
       const ref = db.ref("/pump/state");
       ref.once("value").then(snap => {
         const current = snap.val();
-        const next = !current; // toggle boolean
+        const next = !current;
 
         ref.set(next);
 
@@ -204,6 +204,7 @@
         window._offtime = new Date(val.replace(' ', 'T') + '+09:00');
         updateRuntimeDisplay();
       });
+
       db.ref("/pump/type").on("value", snap => {
         const mode = snap.val();
         currentMode = mode;
