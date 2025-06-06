@@ -68,7 +68,7 @@
       display: inline-block;
       width: 60px;
       height: 34px;
-      margin: 10px 0;
+      margin: 0 10px;
     }
 
     .switch input {
@@ -107,9 +107,22 @@
       transform: translateX(26px);
     }
 
+    .switch-row {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin: 20px 0 5px;
+    }
+
+    .switch-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin: 0 10px;
+    }
+
     .switch-label {
-      display: block;
-      margin-top: 5px;
+      margin-top: 8px;
       font-weight: bold;
     }
 
@@ -136,20 +149,22 @@
         <p>작동 시간: <span id="pumpRuntime">-</span> 초</p>
         <p id="connectionStatus" class="status-fail">연결 상태: 확인 중...</p>
 
-        <!-- 모드 스위치 -->
-        <label class="switch">
-          <input type="checkbox" id="modeSwitch">
-          <span class="slider"></span>
-        </label>
-        <div class="switch-label" id="modeLabel">수동 모드</div>
-
-        <!-- 펌프 ON/OFF 스위치 -->
-        <div id="pumpSwitchContainer" style="display:none;">
-          <label class="switch">
-            <input type="checkbox" id="pumpSwitch">
-            <span class="slider"></span>
-          </label>
-          <div class="switch-label">펌프 제어</div>
+        <!-- 스위치 한 줄 배치 -->
+        <div class="switch-row">
+          <div class="switch-container">
+            <label class="switch">
+              <input type="checkbox" id="modeSwitch">
+              <span class="slider"></span>
+            </label>
+            <div class="switch-label" id="modeStatusText">수동 모드</div>
+          </div>
+          <div class="switch-container" id="pumpSwitchContainer" style="display:none;">
+            <label class="switch">
+              <input type="checkbox" id="pumpSwitch">
+              <span class="slider"></span>
+            </label>
+            <div class="switch-label" id="pumpStatusText">펌프 OFF</div>
+          </div>
         </div>
 
       </div>
@@ -222,8 +237,9 @@
     });
 
     const modeSwitch = document.getElementById("modeSwitch");
-    const modeLabel = document.getElementById("modeLabel");
+    const modeStatusText = document.getElementById("modeStatusText");
     const pumpSwitch = document.getElementById("pumpSwitch");
+    const pumpStatusText = document.getElementById("pumpStatusText");
     const pumpSwitchContainer = document.getElementById("pumpSwitchContainer");
 
     let currentMode = "auto";
@@ -266,6 +282,7 @@
         const val = snap.val();
         document.getElementById("pumpStatus").textContent = val ? "ON" : "OFF";
         pumpSwitch.checked = val;
+        pumpStatusText.textContent = val ? "펌프 ON" : "펌프 OFF";
       });
 
       db.ref("/response/ontime").on("value", snap => {
@@ -287,9 +304,9 @@
         currentMode = mode;
         document.getElementById("pumpType").textContent = (mode === "auto") ? "자동" : "수동";
         modeSwitch.checked = (mode === "auto");
-        modeLabel.textContent = (mode === "auto") ? "자동 모드" : "수동 모드";
+        modeStatusText.textContent = (mode === "auto") ? "자동 모드" : "수동 모드";
 
-        pumpSwitchContainer.style.display = (mode === "manual") ? "block" : "none";
+        pumpSwitchContainer.style.display = (mode === "manual") ? "flex" : "none";
         pumpSwitch.disabled = (mode !== "manual");
       });
 
