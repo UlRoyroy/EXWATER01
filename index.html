@@ -210,28 +210,45 @@
     modeSwitch.addEventListener("change", () => {
       const newMode = modeSwitch.checked ? "auto" : "manual";
       db.ref("/command/type").set(newMode);
-      db.ref("/command/act").set(true); // 추가된 라인
+      db.ref("/command/act").set(true);
       db.ref("/request").set(true);
     });
 
     pumpSwitch.addEventListener("change", () => {
-      const nextState = pumpSwitch.checked;
-      db.ref("/command/state").set(nextState);
-      db.ref("/command/act").set(true); // 추가된 라인
+      const newState = pumpSwitch.checked;
+      db.ref("/command/state").set(newState);
+      db.ref("/command/act").set(true);
       db.ref("/request").set(true);
     });
 
     function initDashboard() {
       db.ref("/request").set(true);
 
+      db.ref("/esp/type").once("value").then(snap => {
+        const mode = snap.val();
+        currentMode = mode;
+        document.getElementById("pumpType").textContent = (mode === "auto") ? "자동" : "수동";
+        modeSwitch.checked = (mode === "auto");
+        modeStatusText.textContent = (mode === "auto") ? "자동 모드" : "수동 모드";
+        pumpSwitchContainer.style.display = (mode === "manual") ? "flex" : "none";
+        pumpSwitch.disabled = (mode !== "manual");
+      });
+
+      db.ref("/esp/state").once("value").then(snap => {
+        const state = snap.val();
+        document.getElementById("pumpStatus").textContent = state ? "ON" : "OFF";
+        pumpSwitch.checked = state;
+        pumpStatusText.textContent = state ? "펌프 ON" : "펌프 OFF";
+      });
+
       db.ref("/response/temperature").on("value", snap => {
-        document.getElementById("temp").textContent = snap.val();
+        document.getElementById("temp").textContent = snap.val() ?? "-";
       });
       db.ref("/response/humidity").on("value", snap => {
-        document.getElementById("humi").textContent = snap.val();
+        document.getElementById("humi").textContent = snap.val() ?? "-";
       });
       db.ref("/response/moisture").on("value", snap => {
-        document.getElementById("soil").textContent = snap.val();
+        document.getElementById("soil").textContent = snap.val() ?? "-";
       });
 
       db.ref("/response/ontime").on("value", snap => {
@@ -250,24 +267,6 @@
 
       db.ref("/response/last_time").on("value", snap => {
         document.getElementById("lastTime").textContent = snap.val() || "-";
-      });
-
-      db.ref("/esp/type").on("value", snap => {
-        const mode = snap.val();
-        currentMode = mode;
-        document.getElementById("pumpType").textContent = (mode === "auto") ? "자동" : "수동";
-        modeSwitch.checked = (mode === "auto");
-        modeStatusText.textContent = (mode === "auto") ? "자동 모드" : "수동 모드";
-
-        pumpSwitchContainer.style.display = (mode === "manual") ? "flex" : "none";
-        pumpSwitch.disabled = (mode !== "manual");
-      });
-
-      db.ref("/esp/state").on("value", snap => {
-        const val = snap.val();
-        document.getElementById("pumpStatus").textContent = val ? "ON" : "OFF";
-        pumpSwitch.checked = val;
-        pumpStatusText.textContent = val ? "펌프 ON" : "펌프 OFF";
       });
 
       setInterval(() => {
