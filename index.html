@@ -1,261 +1,141 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <title>EX 스마트 관수 시스템</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="UTF-8">
+  <title>EXWATER 스마트 급수 시스템</title>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
   <style>
     body {
-      margin: 0;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background-color: #f4f7f9;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      flex-direction: column;
-      min-height: 100vh;
-    }
-    .center-container {
-      width: 90%;
-      max-width: 500px;
+      font-family: 'Segoe UI', sans-serif;
       text-align: center;
+      background-color: #f5f5f5;
+      padding: 20px;
     }
     h1 {
-      color: #2c3e50;
+      color: #0077cc;
     }
-    input, button {
-      width: 80%;
-      padding: 10px;
-      margin: 5px auto;
-      font-size: 16px;
-      border-radius: 5px;
-      border: 1px solid #ccc;
-    }
-    button {
-      background-color: #3498db;
-      color: white;
-      border: none;
-      cursor: pointer;
-    }
-    button:hover {
-      background-color: #2980b9;
-    }
-    .status-card {
-      background-color: white;
-      border-radius: 12px;
+    .card {
+      background: white;
       padding: 20px;
-      margin: 20px 0;
+      margin: 20px auto;
+      border-radius: 12px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      max-width: 400px;
     }
-    .active {
-      background-color: #2ecc71 !important;
-    }
-    #connectionStatus {
-      font-weight: bold;
+    .status {
       margin-top: 10px;
+      font-weight: bold;
     }
-    .status-ok {
-      color: green;
-    }
-    .status-fail {
-      color: red;
-    }
-    footer {
-      margin-top: 30px;
-      font-size: 12px;
-      color: #888;
+    select, button {
+      margin: 10px;
+      padding: 10px;
+      font-size: 16px;
     }
   </style>
 </head>
 <body>
-  <div class="center-container">
-    <h1>EX 스마트 관수 시스템</h1>
-    <p id="currentTime">현재 시각 (KST): -</p>
+  <h1>EXWATER 관수 제어</h1>
 
-    <div id="loginForm">
-      <input type="email" id="email" placeholder="이메일" required><br>
-      <input type="password" id="password" placeholder="비밀번호" required><br>
-      <button id="loginBtn">로그인</button>
-    </div>
-
-    <div id="dashboard" style="display:none">
-      <div class="status-card">
-        <h2>환경 정보</h2>
-        <p>온도: <span id="temp">-</span> ℃ | 습도: <span id="humi">-</span> % | 토양습도: <span id="soil">-</span></p>
-        <p>펌프모드: <span id="pumpType">-</span> | 펌프상태: <span id="pumpStatus">-</span></p>
-        <p>ON 시간: <span id="ontime">-</span></p>
-        <p>OFF 시간: <span id="offtime">-</span></p>
-        <p>작동 시간: <span id="pumpRuntime">-</span> 초</p>
-        <p id="connectionStatus" class="status-fail">연결 상태: 확인 중...</p>
-        <button id="modeToggleBtn">모드 전환</button><br>
-        <button id="togglePump" style="display:none;" disabled>펌프 ON/OFF</button>
-      </div>
-      <button id="logoutBtn">로그아웃</button>
-    </div>
-
-    <footer>© 2025 EX 스마트 관수 시스템</footer>
+  <div class="card">
+    <h2>펌프 설정</h2>
+    <label>모드 선택:
+      <select id="modeSelect">
+        <option value="auto">자동</option>
+        <option value="manual">수동</option>
+      </select>
+    </label>
+    <br>
+    <label>펌프 상태:
+      <select id="stateSelect">
+        <option value="true">ON</option>
+        <option value="false">OFF</option>
+      </select>
+    </label>
+    <br>
+    <button onclick="sendCommand()">명령 전송</button>
+    <p class="status" id="sendStatus">⏳ 상태 확인 중...</p>
   </div>
 
-  <!-- Firebase SDK -->
-  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
+  <div class="card">
+    <h2>현재 상태</h2>
+    <p>모드: <span id="currentMode">-</span></p>
+    <p>펌프 상태: <span id="currentState">-</span></p>
+    <p>응답 시각: <span id="lastTime">-</span></p>
+    <p class="status" id="connStatus">📡 연결 확인 중...</p>
+  </div>
 
   <script>
+    // 🔐 Firebase 설정
     const firebaseConfig = {
-      apiKey: "AIzaSyDir8gHZqsrExrIhF9nzBy4KbGINOuD2q8",
+      apiKey: "AIzaSyAeHP9-GL_uC4c7i9d1R0QCgd99NdzKWD0",
       authDomain: "exwater01.firebaseapp.com",
       databaseURL: "https://exwater01-default-rtdb.asia-southeast1.firebasedatabase.app",
       projectId: "exwater01",
       storageBucket: "exwater01.appspot.com",
-      messagingSenderId: "166996899021",
-      appId: "1:166996899021:web:c6ce758dc566dbc75b6584"
+      messagingSenderId: "325183245992",
+      appId: "1:325183245992:web:f1f3c41bce0a1e4f25f5a7"
     };
+
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    const loginBtn = document.getElementById("loginBtn");
-    const logoutBtn = document.getElementById("logoutBtn");
-    const loginForm = document.getElementById("loginForm");
-    const dashboard = document.getElementById("dashboard");
-    const connectionStatus = document.getElementById("connectionStatus");
+    // 명령 전송
+    function sendCommand() {
+      const type = document.getElementById("modeSelect").value;
+      const state = document.getElementById("stateSelect").value === "true";
 
-    function updateTime() {
-      const now = new Date();
-      now.setHours(now.getHours() + 9);
-      document.getElementById("currentTime").textContent = `현재 시각 (KST): ${now.toISOString().slice(0, 19).replace('T', ' ')}`;
-    }
-    setInterval(updateTime, 1000);
-    updateTime();
-
-    loginBtn.addEventListener("click", () => {
-      const email = document.getElementById("email").value;
-      const password = document.getElementById("password").value;
-      firebase.auth().signInWithEmailAndPassword(email, password)
-        .then(() => {
-          loginForm.style.display = "none";
-          dashboard.style.display = "block";
-          initDashboard();
-        })
-        .catch(err => alert("로그인 실패: " + err.message));
-    });
-
-    logoutBtn.addEventListener("click", () => {
-      firebase.auth().signOut().then(() => {
-        loginForm.style.display = "block";
-        dashboard.style.display = "none";
-      });
-    });
-
-    firebase.auth().onAuthStateChanged((user) => {
-      if (user) {
-        loginForm.style.display = "none";
-        dashboard.style.display = "block";
-        initDashboard();
-      } else {
-        loginForm.style.display = "block";
-        dashboard.style.display = "none";
-      }
-    });
-
-    const toggleBtn = document.getElementById("modeToggleBtn");
-    const togglePumpBtn = document.getElementById("togglePump");
-    let currentMode = "auto";
-
-    toggleBtn.addEventListener("click", () => {
-      const newMode = (currentMode === "auto") ? "manual" : "auto";
-      db.ref("/response/type").set(newMode);
-      db.ref("/request").set(true); // 요청 전송
-    });
-
-    togglePumpBtn.addEventListener("click", () => {
-      const ref = db.ref("/response/state");
-      ref.once("value").then(snap => {
-        const current = snap.val();
-        const next = !current;
-
-        ref.set(next);
-        db.ref("/request").set(true); // 요청 전송
-
-        const nowKST = new Date();
-        nowKST.setHours(nowKST.getHours() + 9);
-        const timeStr = nowKST.toISOString().slice(0, 19).replace('T', ' ');
-
-        if (next === true) {
-          db.ref("/response/ontime").set(timeStr);
-        } else {
-          db.ref("/response/offtime").set(timeStr);
-        }
-      });
-    });
-
-    function initDashboard() {
-      // 첫 진입 시 요청 전송
+      db.ref("/command/type").set(type);
+      db.ref("/command/state").set(state);
       db.ref("/request").set(true);
 
-      db.ref("/response/temperature").on("value", snap => {
-        document.getElementById("temp").textContent = snap.val();
-      });
-      db.ref("/response/humidity").on("value", snap => {
-        document.getElementById("humi").textContent = snap.val();
-      });
-      db.ref("/response/moisture").on("value", snap => {
-        document.getElementById("soil").textContent = snap.val();
-      });
-
-      db.ref("/response/state").on("value", snap => {
-        const val = snap.val();
-        const displayVal = (val === true) ? "ON" : "OFF";
-        document.getElementById("pumpStatus").textContent = displayVal;
-      });
-
-      db.ref("/response/ontime").on("value", snap => {
-        const val = snap.val();
-        document.getElementById("ontime").textContent = val;
-        window._ontime = new Date(val.replace(' ', 'T') + '+09:00');
-        updateRuntimeDisplay();
-      });
-
-      db.ref("/response/offtime").on("value", snap => {
-        const val = snap.val();
-        document.getElementById("offtime").textContent = val;
-        window._offtime = new Date(val.replace(' ', 'T') + '+09:00');
-        updateRuntimeDisplay();
-      });
-
-      db.ref("/response/type").on("value", snap => {
-        const mode = snap.val();
-        currentMode = mode;
-        document.getElementById("pumpType").textContent = (mode === "auto") ? "자동" : "수동";
-        toggleBtn.textContent = (mode === "auto") ? "수동 모드로 전환" : "자동 모드로 전환";
-        togglePumpBtn.style.display = (mode === "manual") ? "inline-block" : "none";
-        togglePumpBtn.disabled = (mode !== "manual");
-      });
-
-      // 5초마다 /response 체크
-      setInterval(() => {
-        db.ref("/response").once("value").then(snap => {
-          const ok = snap.val();
-          if (ok === true) {
-            connectionStatus.textContent = "연결 상태: 정상";
-            connectionStatus.className = "status-ok";
-          } else {
-            connectionStatus.textContent = "연결 상태: 실패";
-            connectionStatus.className = "status-fail";
-          }
-        }).catch(() => {
-          connectionStatus.textContent = "연결 상태: 오류";
-          connectionStatus.className = "status-fail";
-        });
-      }, 5000);
+      document.getElementById("sendStatus").innerText = "📤 명령 전송됨";
     }
 
-    function updateRuntimeDisplay() {
-      if (window._ontime && window._offtime) {
-        const diff = (window._offtime - window._ontime) / 1000;
-        document.getElementById("pumpRuntime").textContent = (diff > 0) ? Math.floor(diff) : "-";
-      }
+    // 현재 상태 확인
+    function updateStatus() {
+      db.ref("/esp/type").once("value").then(snap => {
+        document.getElementById("currentMode").innerText = snap.val();
+        document.getElementById("modeSelect").value = snap.val();
+      });
+
+      db.ref("/esp/state").once("value").then(snap => {
+        const isOn = snap.val();
+        document.getElementById("currentState").innerText = isOn ? "ON" : "OFF";
+        document.getElementById("stateSelect").value = isOn ? "true" : "false";
+      });
+
+      db.ref("/response/last_time").once("value").then(snap => {
+        document.getElementById("lastTime").innerText = snap.val() || "-";
+      });
     }
+
+    // 연결 상태 확인
+    function checkConnection() {
+      const connText = document.getElementById("connStatus");
+      db.ref("/response/last_time").once("value").then(snap => {
+        const lastTime = snap.val();
+        if (lastTime) {
+          connText.innerText = "✅ 연결 정상";
+        } else {
+          connText.innerText = "⚠️ 응답 없음";
+        }
+      }).catch(() => {
+        connText.innerText = "❌ 연결 실패";
+      });
+    }
+
+    // 주기적 갱신
+    setInterval(() => {
+      updateStatus();
+      checkConnection();
+    }, 10000); // 10초마다 상태 확인
+
+    // 초기 로딩
+    window.onload = () => {
+      updateStatus();
+      checkConnection();
+    };
   </script>
 </body>
 </html>
