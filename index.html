@@ -193,37 +193,37 @@
       // 첫 진입 시 요청 전송
       db.ref("/request").set(true);
 
-      db.ref("/sensor/temperature").on("value", snap => {
+      db.ref("/response/temperature").on("value", snap => {
         document.getElementById("temp").textContent = snap.val();
       });
-      db.ref("/sensor/humidity").on("value", snap => {
+      db.ref("/response/humidity").on("value", snap => {
         document.getElementById("humi").textContent = snap.val();
       });
-      db.ref("/sensor/moisture").on("value", snap => {
+      db.ref("/response/moisture").on("value", snap => {
         document.getElementById("soil").textContent = snap.val();
       });
 
-      db.ref("/pump/state").on("value", snap => {
+      db.ref("/response/state").on("value", snap => {
         const val = snap.val();
         const displayVal = (val === true) ? "ON" : "OFF";
         document.getElementById("pumpStatus").textContent = displayVal;
       });
 
-      db.ref("/pump/ontime").on("value", snap => {
+      db.ref("/response/ontime").on("value", snap => {
         const val = snap.val();
         document.getElementById("ontime").textContent = val;
         window._ontime = new Date(val.replace(' ', 'T') + '+09:00');
         updateRuntimeDisplay();
       });
 
-      db.ref("/pump/offtime").on("value", snap => {
+      db.ref("/response/offtime").on("value", snap => {
         const val = snap.val();
         document.getElementById("offtime").textContent = val;
         window._offtime = new Date(val.replace(' ', 'T') + '+09:00');
         updateRuntimeDisplay();
       });
 
-      db.ref("/pump/type").on("value", snap => {
+      db.ref("/response/type").on("value", snap => {
         const mode = snap.val();
         currentMode = mode;
         document.getElementById("pumpType").textContent = (mode === "auto") ? "자동" : "수동";
