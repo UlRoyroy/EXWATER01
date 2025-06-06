@@ -1,334 +1,108 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <title>EX 스마트 관수 시스템</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="UTF-8">
+  <title>EXWATER 스마트 급수 제어</title>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
   <style>
-    body {
-      margin: 0;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background-color: #f4f7f9;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      flex-direction: column;
-      min-height: 100vh;
-    }
-    .center-container {
-      width: 90%;
-      max-width: 500px;
-      text-align: center;
-    }
-    h1 {
-      color: #2c3e50;
-    }
-    input, button {
-      width: 80%;
-      padding: 10px;
-      margin: 5px auto;
-      font-size: 16px;
-      border-radius: 5px;
-      border: 1px solid #ccc;
-    }
-    button {
-      background-color: #3498db;
-      color: white;
-      border: none;
-      cursor: pointer;
-    }
-    button:hover {
-      background-color: #2980b9;
-    }
-    .status-card {
-      background-color: white;
-      border-radius: 12px;
+    body { font-family: 'Arial'; padding: 20px; background: #f2f2f2; }
+    h2 { color: #2c3e50; }
+    .card {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
       padding: 20px;
-      margin: 20px 0;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
     }
-    #connectionStatus {
-      font-weight: bold;
-      margin-top: 10px;
-    }
-    .status-ok {
-      color: green;
-    }
-    .status-fail {
-      color: red;
-    }
-    footer {
-      margin-top: 30px;
-      font-size: 12px;
-      color: #888;
-    }
-
-    .switch {
-      position: relative;
-      display: inline-block;
-      width: 60px;
-      height: 34px;
-      margin: 0 10px;
-    }
-
-    .switch input {
-      opacity: 0;
-      width: 0;
-      height: 0;
-    }
-
-    .slider {
-      position: absolute;
-      cursor: pointer;
-      top: 0; left: 0;
-      right: 0; bottom: 0;
-      background-color: #ccc;
-      transition: .4s;
-      border-radius: 34px;
-    }
-
-    .slider:before {
-      position: absolute;
-      content: "";
-      height: 26px;
-      width: 26px;
-      left: 4px;
-      bottom: 4px;
-      background-color: white;
-      transition: .4s;
-      border-radius: 50%;
-    }
-
-    input:checked + .slider {
-      background-color: #3498db;
-    }
-
-    input:checked + .slider:before {
-      transform: translateX(26px);
-    }
-
-    .switch-row {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      margin: 20px 0 5px;
-    }
-
-    .switch-container {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      margin: 0 10px;
-    }
-
-    .switch-label {
-      margin-top: 8px;
+    .status {
+      font-size: 18px;
       font-weight: bold;
     }
-
+    .status.ok { color: green; }
+    .status.fail { color: red; }
   </style>
 </head>
 <body>
-  <div class="center-container">
-    <h1>EX 스마트 관수 시스템</h1>
-    <p id="currentTime">현재 시각 (KST): -</p>
+  <h2>💧 EXWATER 스마트 급수 대시보드</h2>
 
-    <div id="loginForm">
-      <input type="email" id="email" placeholder="이메일" required><br>
-      <input type="password" id="password" placeholder="비밀번호" required><br>
-      <button id="loginBtn">로그인</button>
-    </div>
-
-    <div id="dashboard" style="display:none">
-      <div class="status-card">
-        <h2>환경 정보</h2>
-        <p>온도: <span id="temp">-</span> ℃ | 습도: <span id="humi">-</span> % | 토양습도: <span id="soil">-</span></p>
-        <p>펌프모드: <span id="pumpType">-</span> | 펌프상태: <span id="pumpStatus">-</span></p>
-        <p>ON 시간: <span id="ontime">-</span></p>
-        <p>OFF 시간: <span id="offtime">-</span></p>
-        <p>작동 시간: <span id="pumpRuntime">-</span> 초</p>
-        <p id="connectionStatus" class="status-fail">연결 상태: 확인 중...</p>
-
-        <!-- 스위치 한 줄 배치 -->
-        <div class="switch-row">
-          <div class="switch-container">
-            <label class="switch">
-              <input type="checkbox" id="modeSwitch">
-              <span class="slider"></span>
-            </label>
-            <div class="switch-label" id="modeStatusText">수동 모드</div>
-          </div>
-          <div class="switch-container" id="pumpSwitchContainer" style="display:none;">
-            <label class="switch">
-              <input type="checkbox" id="pumpSwitch">
-              <span class="slider"></span>
-            </label>
-            <div class="switch-label" id="pumpStatusText">펌프 OFF</div>
-          </div>
-        </div>
-
-      </div>
-      <button id="logoutBtn">로그아웃</button>
-    </div>
-
-    <footer>© 2025 EX 스마트 관수 시스템</footer>
+  <div class="card">
+    <p><strong>모드 (타입):</strong> <span id="type">-</span></p>
+    <p><strong>펌프 상태:</strong> <span id="state">-</span></p>
+    <p><strong>온도:</strong> <span id="temp">-</span> °C</p>
+    <p><strong>습도:</strong> <span id="humi">-</span> %</p>
+    <p><strong>토양습도:</strong> <span id="moisture">-</span></p>
+    <p><strong>마지막 응답 시각:</strong> <span id="last_time">-</span></p>
+    <p class="status" id="connect_status">연결 상태 확인 중...</p>
   </div>
 
-  <!-- Firebase SDK -->
-  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
-
   <script>
+    // Firebase 설정
     const firebaseConfig = {
-      apiKey: "AIzaSyDir8gHZqsrExrIhF9nzBy4KbGINOuD2q8",
+      apiKey: "AIzaSyAeHP9-GL_uC4c7i9d1R0QCgd99NdzKWD0",
       authDomain: "exwater01.firebaseapp.com",
       databaseURL: "https://exwater01-default-rtdb.asia-southeast1.firebasedatabase.app",
       projectId: "exwater01",
       storageBucket: "exwater01.appspot.com",
-      messagingSenderId: "166996899021",
-      appId: "1:166996899021:web:c6ce758dc566dbc75b6584"
+      messagingSenderId: "469173359215",
+      appId: "1:469173359215:web:1b924de7c1ff9d0d56c5db"
     };
+
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    const loginBtn = document.getElementById("loginBtn");
-    const logoutBtn = document.getElementById("logoutBtn");
-    const loginForm = document.getElementById("loginForm");
-    const dashboard = document.getElementById("dashboard");
-    const connectionStatus = document.getElementById("connectionStatus");
+    const $ = id => document.getElementById(id);
 
-    function updateTime() {
+    function updateUI(data) {
+      $("type").textContent = data.type ?? "-";
+      $("state").textContent = data.state ? "ON" : "OFF";
+      $("temp").textContent = data.temperature?.toFixed(1) ?? "-";
+      $("humi").textContent = data.humidity?.toFixed(1) ?? "-";
+      $("moisture").textContent = data.moisture ?? "-";
+      $("last_time").textContent = data.last_time ?? "-";
+
       const now = new Date();
-      now.setHours(now.getHours() + 9);
-      document.getElementById("currentTime").textContent = `현재 시각 (KST): ${now.toISOString().slice(0, 19).replace('T', ' ')}`;
+      const last = new Date(data.last_time);
+      const diffSec = (now - last) / 1000;
+
+      if (!isNaN(diffSec) && diffSec < 20) {
+        $("connect_status").textContent = `✅ 연결 정상 (${Math.floor(diffSec)}초 전 응답)`;
+        $("connect_status").className = "status ok";
+      } else {
+        $("connect_status").textContent = "❌ 연결 끊김";
+        $("connect_status").className = "status fail";
+      }
     }
-    setInterval(updateTime, 1000);
-    updateTime();
 
-    loginBtn.addEventListener("click", () => {
-      const email = document.getElementById("email").value;
-      const password = document.getElementById("password").value;
-      firebase.auth().signInWithEmailAndPassword(email, password)
-        .then(() => {
-          loginForm.style.display = "none";
-          dashboard.style.display = "block";
-          initDashboard();
-        })
-        .catch(err => alert("로그인 실패: " + err.message));
-    });
+    async function fetchDataAndRequest() {
+      try {
+        await db.ref("/request").set(true);
 
-    logoutBtn.addEventListener("click", () => {
-      firebase.auth().signOut().then(() => {
-        loginForm.style.display = "block";
-        dashboard.style.display = "none";
-      });
-    });
+        const [typeSnap, stateSnap, respSnap] = await Promise.all([
+          db.ref("/esp/type").get(),
+          db.ref("/esp/state").get(),
+          db.ref("/response").get()
+        ]);
 
-    firebase.auth().onAuthStateChanged((user) => {
-      if (user) {
-        loginForm.style.display = "none";
-        dashboard.style.display = "block";
-        initDashboard();
-      } else {
-        loginForm.style.display = "block";
-        dashboard.style.display = "none";
-      }
-    });
-
-    const modeSwitch = document.getElementById("modeSwitch");
-    const modeStatusText = document.getElementById("modeStatusText");
-    const pumpSwitch = document.getElementById("pumpSwitch");
-    const pumpStatusText = document.getElementById("pumpStatusText");
-    const pumpSwitchContainer = document.getElementById("pumpSwitchContainer");
-
-    let currentMode = "auto";
-
-    modeSwitch.addEventListener("change", () => {
-      const newMode = modeSwitch.checked ? "auto" : "manual";
-      db.ref("/command/type").set(newMode);
-      db.ref("/request").set(true);
-    });
-
-    pumpSwitch.addEventListener("change", () => {
-      const nextState = pumpSwitch.checked;
-      db.ref("/command/state").set(nextState);
-      db.ref("/request").set(true);
-
-      const nowKST = new Date();
-      nowKST.setHours(nowKST.getHours() + 9);
-      const timeStr = nowKST.toISOString().slice(0, 19).replace('T', ' ');
-      if (nextState) {
-        db.ref("/response/ontime").set(timeStr);
-      } else {
-        db.ref("/response/offtime").set(timeStr);
-      }
-    });
-
-    function initDashboard() {
-      db.ref("/request").set(true);
-
-      db.ref("/response/temperature").on("value", snap => {
-        document.getElementById("temp").textContent = snap.val();
-      });
-      db.ref("/response/humidity").on("value", snap => {
-        document.getElementById("humi").textContent = snap.val();
-      });
-      db.ref("/response/moisture").on("value", snap => {
-        document.getElementById("soil").textContent = snap.val();
-      });
-
-      db.ref("/response/state").on("value", snap => {
-        const val = snap.val();
-        document.getElementById("pumpStatus").textContent = val ? "ON" : "OFF";
-        pumpSwitch.checked = val;
-        pumpStatusText.textContent = val ? "펌프 ON" : "펌프 OFF";
-      });
-
-      db.ref("/response/ontime").on("value", snap => {
-        const val = snap.val();
-        document.getElementById("ontime").textContent = val || "-";
-        window._ontime = val ? new Date(val.replace(' ', 'T') + '+09:00') : null;
-        updateRuntimeDisplay();
-      });
-
-      db.ref("/response/offtime").on("value", snap => {
-        const val = snap.val();
-        document.getElementById("offtime").textContent = val || "-";
-        window._offtime = val ? new Date(val.replace(' ', 'T') + '+09:00') : null;
-        updateRuntimeDisplay();
-      });
-
-      db.ref("/response/type").on("value", snap => {
-        const mode = snap.val();
-        currentMode = mode;
-        document.getElementById("pumpType").textContent = (mode === "auto") ? "자동" : "수동";
-        modeSwitch.checked = (mode === "auto");
-        modeStatusText.textContent = (mode === "auto") ? "자동 모드" : "수동 모드";
-
-        pumpSwitchContainer.style.display = (mode === "manual") ? "flex" : "none";
-        pumpSwitch.disabled = (mode !== "manual");
-      });
-
-      setInterval(() => {
-        db.ref("/response").once("value").then(() => {
-          connectionStatus.textContent = "연결 상태: 정상";
-          connectionStatus.className = "status-ok";
-        }).catch(() => {
-          connectionStatus.textContent = "연결 상태: 실패";
-          connectionStatus.className = "status-fail";
+        updateUI({
+          type: typeSnap.val(),
+          state: stateSnap.val(),
+          temperature: respSnap.child("temperature").val(),
+          humidity: respSnap.child("humidity").val(),
+          moisture: respSnap.child("moisture").val(),
+          last_time: respSnap.child("last_time").val()
         });
-      }, 10000);
-    }
 
-    function updateRuntimeDisplay() {
-      if (window._ontime && window._offtime) {
-        const diff = (window._offtime - window._ontime) / 1000;
-        document.getElementById("pumpRuntime").textContent = (diff > 0) ? Math.floor(diff) : "-";
-      } else {
-        document.getElementById("pumpRuntime").textContent = "-";
+      } catch (err) {
+        console.error("🔥 Firebase 오류:", err);
+        $("connect_status").textContent = "❌ 연결 실패 (Firebase)";
+        $("connect_status").className = "status fail";
       }
     }
+
+    // 최초 요청 및 10초 주기 반복
+    fetchDataAndRequest();
+    setInterval(fetchDataAndRequest, 10000);
   </script>
 </body>
 </html>
