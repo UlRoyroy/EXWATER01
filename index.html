@@ -5,7 +5,122 @@
   <title>EX 스마트 관수 시스템</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    /* [생략: 기존 스타일 유지] */
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f7f9fc;
+      color: #333;
+    }
+
+    .center-container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+      text-align: center;
+    }
+
+    h1 {
+      margin-bottom: 10px;
+    }
+
+    .status-card {
+      background-color: #fff;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      padding: 20px;
+      margin-top: 20px;
+    }
+
+    footer {
+      margin-top: 40px;
+      font-size: 0.9em;
+      color: #999;
+    }
+
+    button {
+      background-color: #3498db;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 10px 20px;
+      margin-top: 10px;
+      font-size: 1em;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #2980b9;
+    }
+
+    .switch-row {
+      display: flex;
+      justify-content: space-around;
+      margin-top: 20px;
+    }
+
+    .switch-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .switch-label {
+      margin-top: 8px;
+      font-weight: bold;
+    }
+
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 60px;
+      height: 34px;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #ccc;
+      transition: 0.4s;
+      border-radius: 34px;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 26px;
+      width: 26px;
+      left: 4px;
+      bottom: 4px;
+      background-color: white;
+      transition: 0.4s;
+      border-radius: 50%;
+    }
+
+    input:checked + .slider {
+      background-color: #4caf50;
+    }
+
+    input:checked + .slider:before {
+      transform: translateX(26px);
+    }
+
+    .status-ok {
+      color: green;
+      font-weight: bold;
+    }
+
+    .status-fail {
+      color: red;
+      font-weight: bold;
+    }
   </style>
 </head>
 <body>
@@ -71,12 +186,6 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    const loginBtn = document.getElementById("loginBtn");
-    const logoutBtn = document.getElementById("logoutBtn");
-    const loginForm = document.getElementById("loginForm");
-    const dashboard = document.getElementById("dashboard");
-    const connectionStatus = document.getElementById("connectionStatus");
-
     function updateTime() {
       const now = new Date();
       now.setHours(now.getHours() + 9);
@@ -84,6 +193,11 @@
     }
     setInterval(updateTime, 1000);
     updateTime();
+
+    const loginBtn = document.getElementById("loginBtn");
+    const logoutBtn = document.getElementById("logoutBtn");
+    const loginForm = document.getElementById("loginForm");
+    const dashboard = document.getElementById("dashboard");
 
     loginBtn.addEventListener("click", () => {
       const email = document.getElementById("email").value;
@@ -104,7 +218,7 @@
       });
     });
 
-    firebase.auth().onAuthStateChanged((user) => {
+    firebase.auth().onAuthStateChanged(user => {
       if (user) {
         loginForm.style.display = "none";
         dashboard.style.display = "block";
@@ -116,13 +230,10 @@
     });
 
     const modeSwitch = document.getElementById("modeSwitch");
-    const modeStatusText = document.getElementById("modeStatusText");
     const pumpSwitch = document.getElementById("pumpSwitch");
+    const modeStatusText = document.getElementById("modeStatusText");
     const pumpStatusText = document.getElementById("pumpStatusText");
     const pumpSwitchContainer = document.getElementById("pumpSwitchContainer");
-
-    let currentMode = "auto";
-    let polling = false;
 
     modeSwitch.addEventListener("change", () => {
       const newMode = modeSwitch.checked ? "auto" : "manual";
@@ -138,7 +249,7 @@
       db.ref("/request").set(true);
     });
 
-    function updatePumpStatus() {
+    function updatePumpInfo() {
       db.ref("/esp/state").once("value").then(snap => {
         const state = snap.val();
         document.getElementById("pumpStatus").textContent = state ? "ON" : "OFF";
@@ -148,20 +259,15 @@
 
       db.ref("/esp/type").once("value").then(snap => {
         const mode = snap.val();
-        currentMode = mode;
-        document.getElementById("pumpType").textContent = (mode === "auto") ? "자동" : "수동";
-        modeSwitch.checked = (mode === "auto");
-        modeStatusText.textContent = (mode === "auto") ? "자동 모드" : "수동 모드";
+        document.getElementById("pumpType").textContent = mode === "auto" ? "자동" : "수동";
+        modeSwitch.checked = mode === "auto";
+        modeStatusText.textContent = mode === "auto" ? "자동 모드" : "수동 모드";
         pumpSwitchContainer.style.display = (mode === "manual") ? "flex" : "none";
         pumpSwitch.disabled = (mode !== "manual");
       });
     }
 
     function initDashboard() {
-      db.ref("/request").set(true);
-
-      updatePumpStatus();
-
       db.ref("/response/temperature").on("value", snap => {
         document.getElementById("temp").textContent = snap.val() ?? "-";
       });
@@ -173,17 +279,14 @@
       });
 
       db.ref("/response/ontime").on("value", snap => {
-        const val = snap.val();
-        document.getElementById("ontime").textContent = val || "-";
-        window._ontime = val ? new Date(val.replace(' ', 'T') + '+09:00') : null;
-        updateRuntimeDisplay();
+        document.getElementById("ontime").textContent = snap.val() || "-";
+        window._ontime = snap.val() ? new Date(snap.val().replace(" ", "T") + "+09:00") : null;
+        updateRuntime();
       });
-
       db.ref("/response/offtime").on("value", snap => {
-        const val = snap.val();
-        document.getElementById("offtime").textContent = val || "-";
-        window._offtime = val ? new Date(val.replace(' ', 'T') + '+09:00') : null;
-        updateRuntimeDisplay();
+        document.getElementById("offtime").textContent = snap.val() || "-";
+        window._offtime = snap.val() ? new Date(snap.val().replace(" ", "T") + "+09:00") : null;
+        updateRuntime();
       });
 
       db.ref("/response/last_time").on("value", snap => {
@@ -191,29 +294,19 @@
       });
 
       setInterval(() => {
-        if (!polling) {
-          polling = true;
-          db.ref("/request").set(true)
-            .then(() => {
-              connectionStatus.textContent = "연결 상태: 정상";
-              connectionStatus.className = "status-ok";
-              updatePumpStatus(); // 여기서 상태 갱신
-            })
-            .catch(() => {
-              connectionStatus.textContent = "연결 상태: 실패";
-              connectionStatus.className = "status-fail";
-            })
-            .finally(() => {
-              polling = false;
-            });
-        }
+        db.ref("/request").set(true);
+        updatePumpInfo();
+        document.getElementById("connectionStatus").textContent = "연결 상태: 정상";
+        document.getElementById("connectionStatus").className = "status-ok";
       }, 10000);
+
+      updatePumpInfo();
     }
 
-    function updateRuntimeDisplay() {
+    function updateRuntime() {
       if (window._ontime && window._offtime) {
-        const diff = (window._offtime - window._ontime) / 1000;
-        document.getElementById("pumpRuntime").textContent = (diff > 0) ? Math.floor(diff) : "-";
+        const sec = Math.floor((window._offtime - window._ontime) / 1000);
+        document.getElementById("pumpRuntime").textContent = sec > 0 ? sec : "-";
       } else {
         document.getElementById("pumpRuntime").textContent = "-";
       }
