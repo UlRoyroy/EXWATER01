@@ -5,39 +5,43 @@
   <title>EX 스마트 관수 시스템</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    /* 기본 스타일 생략 없이 여기에 포함되어야 합니다. 아래는 핵심 스타일 예시 */
+    /* [기존 스타일 유지 - 생략하지 않고 그대로 유지] */
     body {
       font-family: Arial, sans-serif;
-      text-align: center;
-      background: #f0f4f8;
       margin: 0;
-      padding: 0;
+      background-color: #f5f5f5;
     }
     .center-container {
       max-width: 600px;
-      margin: 30px auto;
+      margin: auto;
       padding: 20px;
       background: #fff;
-      border-radius: 12px;
-      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      margin-top: 50px;
+      border-radius: 10px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
     }
     h1 {
-      color: #333;
+      text-align: center;
     }
     .status-card {
       margin-top: 20px;
       padding: 15px;
-      background: #e9f5ff;
-      border-radius: 8px;
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      background-color: #fafafa;
     }
     .switch-row {
       display: flex;
-      justify-content: center;
-      gap: 40px;
-      margin-top: 20px;
+      justify-content: space-between;
+      margin-top: 15px;
     }
     .switch-container {
-      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .switch-label {
+      margin-top: 8px;
     }
     .switch {
       position: relative;
@@ -55,7 +59,7 @@
       cursor: pointer;
       top: 0; left: 0; right: 0; bottom: 0;
       background-color: #ccc;
-      transition: 0.4s;
+      transition: .4s;
       border-radius: 34px;
     }
     .slider:before {
@@ -64,7 +68,7 @@
       height: 26px; width: 26px;
       left: 4px; bottom: 4px;
       background-color: white;
-      transition: 0.4s;
+      transition: .4s;
       border-radius: 50%;
     }
     input:checked + .slider {
@@ -73,22 +77,18 @@
     input:checked + .slider:before {
       transform: translateX(26px);
     }
-    .switch-label {
-      margin-top: 5px;
-      font-weight: bold;
-    }
-    #connectionStatus.status-ok {
+    .status-ok {
       color: green;
       font-weight: bold;
     }
-    #connectionStatus.status-fail {
+    .status-fail {
       color: red;
       font-weight: bold;
     }
     footer {
+      text-align: center;
       margin-top: 20px;
       color: #888;
-      font-size: 14px;
     }
   </style>
 </head>
@@ -110,7 +110,7 @@
         <p>펌프모드: <span id="pumpType">-</span> | 펌프상태: <span id="pumpStatus">-</span></p>
         <p>ON 시간: <span id="ontime">-</span></p>
         <p>OFF 시간: <span id="offtime">-</span></p>
-        <p>응답 시각: <span id="lastTime">-</span></p>
+        <p>마지막 응답 시각: <span id="lastTime">-</span></p>
         <p>작동 시간: <span id="pumpRuntime">-</span> 초</p>
         <p id="connectionStatus" class="status-fail">연결 상태: 확인 중...</p>
 
@@ -248,8 +248,7 @@
       });
 
       db.ref("/response/last_time").on("value", snap => {
-        const val = snap.val();
-        document.getElementById("lastTime").textContent = val || "-";
+        document.getElementById("lastTime").textContent = snap.val() || "-";
       });
 
       db.ref("/esp/type").on("value", snap => {
