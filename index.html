@@ -12,18 +12,15 @@
       background-color: #f7f9fc;
       color: #333;
     }
-
     .center-container {
       max-width: 600px;
       margin: 0 auto;
       padding: 20px;
       text-align: center;
     }
-
     h1 {
       margin-bottom: 10px;
     }
-
     .status-card {
       background-color: #fff;
       border-radius: 12px;
@@ -31,13 +28,11 @@
       padding: 20px;
       margin-top: 20px;
     }
-
     footer {
       margin-top: 40px;
       font-size: 0.9em;
       color: #999;
     }
-
     button {
       background-color: #3498db;
       color: #fff;
@@ -48,41 +43,34 @@
       font-size: 1em;
       cursor: pointer;
     }
-
     button:hover {
       background-color: #2980b9;
     }
-
     .switch-row {
       display: flex;
       justify-content: space-around;
       margin-top: 20px;
     }
-
     .switch-container {
       display: flex;
       flex-direction: column;
       align-items: center;
     }
-
     .switch-label {
       margin-top: 8px;
       font-weight: bold;
     }
-
     .switch {
       position: relative;
       display: inline-block;
       width: 60px;
       height: 34px;
     }
-
     .switch input {
       opacity: 0;
       width: 0;
       height: 0;
     }
-
     .slider {
       position: absolute;
       cursor: pointer;
@@ -91,7 +79,6 @@
       transition: 0.4s;
       border-radius: 34px;
     }
-
     .slider:before {
       position: absolute;
       content: "";
@@ -103,20 +90,16 @@
       transition: 0.4s;
       border-radius: 50%;
     }
-
     input:checked + .slider {
       background-color: #4caf50;
     }
-
     input:checked + .slider:before {
       transform: translateX(26px);
     }
-
     .status-ok {
       color: green;
       font-weight: bold;
     }
-
     .status-fail {
       color: red;
       font-weight: bold;
@@ -153,7 +136,7 @@
             </label>
             <div class="switch-label" id="modeStatusText">수동 모드</div>
           </div>
-          <div class="switch-container" id="pumpSwitchContainer" style="display:none;">
+          <div class="switch-container" id="pumpSwitchContainer">
             <label class="switch">
               <input type="checkbox" id="pumpSwitch">
               <span class="slider"></span>
@@ -233,7 +216,8 @@
     const pumpSwitch = document.getElementById("pumpSwitch");
     const modeStatusText = document.getElementById("modeStatusText");
     const pumpStatusText = document.getElementById("pumpStatusText");
-    const pumpSwitchContainer = document.getElementById("pumpSwitchContainer");
+
+    let currentMode = "manual"; // default
 
     modeSwitch.addEventListener("change", () => {
       const newMode = modeSwitch.checked ? "auto" : "manual";
@@ -242,7 +226,13 @@
       db.ref("/request").set(true);
     });
 
-    pumpSwitch.addEventListener("change", () => {
+    pumpSwitch.addEventListener("change", (e) => {
+      if (currentMode === "auto") {
+        e.preventDefault();
+        pumpSwitch.checked = !pumpSwitch.checked; // revert UI toggle
+        alert("자동 모드에서는 펌프 상태를 수동으로 변경할 수 없습니다.");
+        return;
+      }
       const newState = pumpSwitch.checked;
       db.ref("/command/state").set(newState);
       db.ref("/command/act").set(true);
@@ -259,11 +249,10 @@
 
       db.ref("/esp/type").once("value").then(snap => {
         const mode = snap.val();
+        currentMode = mode;
         document.getElementById("pumpType").textContent = mode === "auto" ? "자동" : "수동";
         modeSwitch.checked = mode === "auto";
         modeStatusText.textContent = mode === "auto" ? "자동 모드" : "수동 모드";
-        pumpSwitchContainer.style.display = (mode === "manual") ? "flex" : "none";
-        pumpSwitch.disabled = (mode !== "manual");
       });
     }
 
