@@ -50,6 +50,16 @@
     .active {
       background-color: #2ecc71 !important;
     }
+    #connectionStatus {
+      font-weight: bold;
+      margin-top: 10px;
+    }
+    .status-ok {
+      color: green;
+    }
+    .status-fail {
+      color: red;
+    }
     footer {
       margin-top: 30px;
       font-size: 12px;
@@ -76,6 +86,7 @@
         <p>ON 시간: <span id="ontime">-</span></p>
         <p>OFF 시간: <span id="offtime">-</span></p>
         <p>작동 시간: <span id="pumpRuntime">-</span> 초</p>
+        <p id="connectionStatus" class="status-fail">연결 상태: 확인 중...</p>
         <button id="modeToggleBtn">모드 전환</button><br>
         <button id="togglePump" style="display:none;" disabled>펌프 ON/OFF</button>
       </div>
@@ -107,10 +118,11 @@
     const logoutBtn = document.getElementById("logoutBtn");
     const loginForm = document.getElementById("loginForm");
     const dashboard = document.getElementById("dashboard");
+    const connectionStatus = document.getElementById("connectionStatus");
 
     function updateTime() {
       const now = new Date();
-      now.setHours(now.getHours() + 9); // KST
+      now.setHours(now.getHours() + 9);
       document.getElementById("currentTime").textContent = `현재 시각 (KST): ${now.toISOString().slice(0, 19).replace('T', ' ')}`;
     }
     setInterval(updateTime, 1000);
@@ -153,6 +165,7 @@
     toggleBtn.addEventListener("click", () => {
       const newMode = (currentMode === "auto") ? "manual" : "auto";
       db.ref("/pump/type").set(newMode);
+      db.ref("/request").set(true); // 요청 전송
     });
 
     togglePumpBtn.addEventListener("click", () => {
@@ -162,6 +175,7 @@
         const next = !current;
 
         ref.set(next);
+        db.ref("/request").set(true); // 요청 전송
 
         const nowKST = new Date();
         nowKST.setHours(nowKST.getHours() + 9);
@@ -176,6 +190,9 @@
     });
 
     function initDashboard() {
+      // 첫 진입 시 요청 전송
+      db.ref("/request").set(true);
+
       db.ref("/sensor/temperature").on("value", snap => {
         document.getElementById("temp").textContent = snap.val();
       });
@@ -198,6 +215,7 @@
         window._ontime = new Date(val.replace(' ', 'T') + '+09:00');
         updateRuntimeDisplay();
       });
+
       db.ref("/pump/offtime").on("value", snap => {
         const val = snap.val();
         document.getElementById("offtime").textContent = val;
@@ -213,6 +231,23 @@
         togglePumpBtn.style.display = (mode === "manual") ? "inline-block" : "none";
         togglePumpBtn.disabled = (mode !== "manual");
       });
+
+      // 5초마다 /response 체크
+      setInterval(() => {
+        db.ref("/response").once("value").then(snap => {
+          const ok = snap.val();
+          if (ok === true) {
+            connectionStatus.textContent = "연결 상태: 정상";
+            connectionStatus.className = "status-ok";
+          } else {
+            connectionStatus.textContent = "연결 상태: 실패";
+            connectionStatus.className = "status-fail";
+          }
+        }).catch(() => {
+          connectionStatus.textContent = "연결 상태: 오류";
+          connectionStatus.className = "status-fail";
+        });
+      }, 5000);
     }
 
     function updateRuntimeDisplay() {
