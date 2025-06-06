@@ -164,12 +164,12 @@
 
     toggleBtn.addEventListener("click", () => {
       const newMode = (currentMode === "auto") ? "manual" : "auto";
-      db.ref("/pump/type").set(newMode);
+      db.ref("/response/type").set(newMode);
       db.ref("/request").set(true); // 요청 전송
     });
 
     togglePumpBtn.addEventListener("click", () => {
-      const ref = db.ref("/pump/state");
+      const ref = db.ref("/response/state");
       ref.once("value").then(snap => {
         const current = snap.val();
         const next = !current;
@@ -182,9 +182,9 @@
         const timeStr = nowKST.toISOString().slice(0, 19).replace('T', ' ');
 
         if (next === true) {
-          db.ref("/pump/ontime").set(timeStr);
+          db.ref("/response/ontime").set(timeStr);
         } else {
-          db.ref("/pump/offtime").set(timeStr);
+          db.ref("/response/offtime").set(timeStr);
         }
       });
     });
