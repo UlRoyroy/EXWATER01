@@ -149,7 +149,6 @@
         <p>작동 시간: <span id="pumpRuntime">-</span> 초</p>
         <p id="connectionStatus" class="status-fail">연결 상태: 확인 중...</p>
 
-        <!-- 스위치 한 줄 배치 -->
         <div class="switch-row">
           <div class="switch-container">
             <label class="switch">
@@ -254,15 +253,7 @@
       const nextState = pumpSwitch.checked;
       db.ref("/command/state").set(nextState);
       db.ref("/request").set(true);
-
-      const nowKST = new Date();
-      nowKST.setHours(nowKST.getHours() + 9);
-      const timeStr = nowKST.toISOString().slice(0, 19).replace('T', ' ');
-      if (nextState) {
-        db.ref("/response/ontime").set(timeStr);
-      } else {
-        db.ref("/response/offtime").set(timeStr);
-      }
+      // ON/OFF 시간 기록 제거됨
     });
 
     function initDashboard() {
