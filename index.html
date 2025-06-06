@@ -5,8 +5,79 @@
   <title>EX 스마트 관수 시스템</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    /* [기존 스타일 유지 - 생략하지 않고 그대로 유지] */
-    /* ... (생략 없이 기존 CSS 전체 포함됨) */
+    /* 기존 스타일은 그대로 유지 */
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f7f7f7;
+      margin: 0;
+      padding: 0;
+    }
+    .center-container {
+      max-width: 600px;
+      margin: 30px auto;
+      background: #fff;
+      padding: 25px;
+      border-radius: 10px;
+      box-shadow: 0 0 15px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+    .status-card {
+      margin-top: 20px;
+    }
+    .switch-row {
+      display: flex;
+      justify-content: center;
+      margin-top: 20px;
+      gap: 40px;
+    }
+    .switch-container {
+      text-align: center;
+    }
+    .switch-label {
+      margin-top: 8px;
+    }
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 50px;
+      height: 28px;
+    }
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #ccc;
+      transition: .4s;
+      border-radius: 28px;
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 22px;
+      width: 22px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .4s;
+      border-radius: 50%;
+    }
+    input:checked + .slider {
+      background-color: #4caf50;
+    }
+    input:checked + .slider:before {
+      transform: translateX(22px);
+    }
+    .status-ok {
+      color: green;
+    }
+    .status-fail {
+      color: red;
+    }
   </style>
 </head>
 <body>
@@ -122,22 +193,21 @@
     const pumpSwitchContainer = document.getElementById("pumpSwitchContainer");
 
     let currentMode = "auto";
-    let polling = false;
 
     modeSwitch.addEventListener("change", () => {
       const newMode = modeSwitch.checked ? "auto" : "manual";
       db.ref("/command/type").set(newMode);
-      db.ref("/request").set(true);
+      db.ref("/command/act").set(true);
     });
 
     pumpSwitch.addEventListener("change", () => {
       const nextState = pumpSwitch.checked;
       db.ref("/command/state").set(nextState);
-      db.ref("/request").set(true);
+      db.ref("/command/act").set(true);
     });
 
     function initDashboard() {
-      db.ref("/request").set(true);
+      db.ref("/request").set(true); // 초기 요청
 
       db.ref("/response/temperature").on("value", snap => {
         document.getElementById("temp").textContent = snap.val();
@@ -181,23 +251,17 @@
         pumpStatusText.textContent = val ? "펌프 ON" : "펌프 OFF";
       });
 
-      // 10초마다 안정적으로 request 발생 및 연결 확인
+      // 10초마다 /request 경로에 true 전송하여 상태 확인
       setInterval(() => {
-        if (!polling) {
-          polling = true;
-          db.ref("/request").set(true)
-            .then(() => {
-              connectionStatus.textContent = "연결 상태: 정상";
-              connectionStatus.className = "status-ok";
-            })
-            .catch(() => {
-              connectionStatus.textContent = "연결 상태: 실패";
-              connectionStatus.className = "status-fail";
-            })
-            .finally(() => {
-              polling = false;
-            });
-        }
+        db.ref("/request").set(true)
+          .then(() => {
+            connectionStatus.textContent = "연결 상태: 정상";
+            connectionStatus.className = "status-ok";
+          })
+          .catch(() => {
+            connectionStatus.textContent = "연결 상태: 실패";
+            connectionStatus.className = "status-fail";
+          });
       }, 10000);
     }
 
