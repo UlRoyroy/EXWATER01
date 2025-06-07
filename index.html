@@ -217,26 +217,26 @@
     const modeStatusText = document.getElementById("modeStatusText");
     const pumpStatusText = document.getElementById("pumpStatusText");
 
-    let currentMode = "manual"; // default
+    let currentMode = "manual";
 
     modeSwitch.addEventListener("change", () => {
       const newMode = modeSwitch.checked ? "auto" : "manual";
       db.ref("/command/type").set(newMode);
       db.ref("/command/act").set(true);
-      db.ref("/request").set(true);
+      db.ref("/request").set(false); // 변경된 부분
     });
 
     pumpSwitch.addEventListener("change", (e) => {
       if (currentMode === "auto") {
         e.preventDefault();
-        pumpSwitch.checked = !pumpSwitch.checked; // revert UI toggle
+        pumpSwitch.checked = !pumpSwitch.checked;
         alert("자동 모드에서는 펌프 상태를 수동으로 변경할 수 없습니다.");
         return;
       }
       const newState = pumpSwitch.checked;
       db.ref("/command/state").set(newState);
       db.ref("/command/act").set(true);
-      db.ref("/request").set(true);
+      db.ref("/request").set(false); // 변경된 부분
     });
 
     function updatePumpInfo() {
