@@ -126,7 +126,8 @@
         <p>OFF 시간: <span id="offtime">-</span></p>
         <p>마지막 응답 시각: <span id="lastTime">-</span></p>
         <p>작동 시간: <span id="pumpRuntime">-</span> 초</p>
-        <p id="connectionStatus" class="status-fail">연결 상태: 확인 중...</p>
+        <p id="connectionStatus" class="status-fail">FireBase: 확인 중...</p>
+        <p id="espStatus" class="status-fail">ESP: 확인 중...</p>
 
         <div class="switch-row">
           <div class="switch-container">
@@ -151,7 +152,6 @@
     <footer>© 2025 EX 스마트 관수 시스템</footer>
   </div>
 
-  <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
@@ -173,6 +173,7 @@
       const now = new Date();
       now.setHours(now.getHours() + 9);
       document.getElementById("currentTime").textContent = `현재 시각 (KST): ${now.toISOString().slice(0, 19).replace('T', ' ')}`;
+      window._nowKST = now;
     }
     setInterval(updateTime, 1000);
     updateTime();
@@ -218,12 +219,13 @@
     const pumpStatusText = document.getElementById("pumpStatusText");
 
     let currentMode = "manual";
+    let lastResponseTime = null;
 
     modeSwitch.addEventListener("change", () => {
       const newMode = modeSwitch.checked ? "auto" : "manual";
       db.ref("/command/type").set(newMode);
       db.ref("/command/act").set(true);
-      db.ref("/request").set(false); // 변경된 부분
+      db.ref("/request").set(false);
     });
 
     pumpSwitch.addEventListener("change", (e) => {
@@ -236,7 +238,7 @@
       const newState = pumpSwitch.checked;
       db.ref("/command/state").set(newState);
       db.ref("/command/act").set(true);
-      db.ref("/request").set(false); // 변경된 부분
+      db.ref("/request").set(false);
     });
 
     function updatePumpInfo() {
@@ -254,6 +256,20 @@
         modeSwitch.checked = mode === "auto";
         modeStatusText.textContent = mode === "auto" ? "자동 모드" : "수동 모드";
       });
+    }
+
+    function updateESPStatus() {
+      if (!lastResponseTime || !window._nowKST) return;
+
+      const diffSec = Math.abs((window._nowKST - lastResponseTime) / 1000);
+      const espStatus = document.getElementById("espStatus");
+      if (diffSec <= 30) {
+        espStatus.textContent = "ESP: 정상";
+        espStatus.className = "status-ok";
+      } else {
+        espStatus.textContent = "ESP: 이상";
+        espStatus.className = "status-fail";
+      }
     }
 
     function initDashboard() {
@@ -279,13 +295,16 @@
       });
 
       db.ref("/response/last_time").on("value", snap => {
-        document.getElementById("lastTime").textContent = snap.val() || "-";
+        const val = snap.val();
+        document.getElementById("lastTime").textContent = val || "-";
+        lastResponseTime = val ? new Date(val.replace(" ", "T") + "+09:00") : null;
       });
 
       setInterval(() => {
         db.ref("/request").set(true);
         updatePumpInfo();
-        document.getElementById("connectionStatus").textContent = "연결 상태: 정상";
+        updateESPStatus();
+        document.getElementById("connectionStatus").textContent = "FireBase: 정상";
         document.getElementById("connectionStatus").className = "status-ok";
       }, 10000);
 
@@ -303,3 +322,4 @@
   </script>
 </body>
 </html>
+
