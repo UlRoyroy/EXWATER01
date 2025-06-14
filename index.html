@@ -170,6 +170,7 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
+    // KST 현재 시간 업데이트
     function updateTime() {
       const now = new Date();
       now.setHours(now.getHours() + 9);
@@ -191,7 +192,10 @@
         .then(() => {
           loginForm.style.display = "none";
           dashboard.style.display = "block";
-          initDashboard();
+          if (!window.dashboardInitialized) {
+            initDashboard();
+            window.dashboardInitialized = true;
+          }
         })
         .catch(err => alert("로그인 실패: " + err.message));
     });
@@ -207,10 +211,14 @@
       if (user) {
         loginForm.style.display = "none";
         dashboard.style.display = "block";
-        initDashboard();
+        if (!window.dashboardInitialized) {
+          initDashboard();
+          window.dashboardInitialized = true;
+        }
       } else {
         loginForm.style.display = "block";
         dashboard.style.display = "none";
+        window.dashboardInitialized = false;
       }
     });
 
@@ -221,12 +229,13 @@
 
     let currentMode = "manual";
     let lastResponseTime = null;
+    let prevResponseTime = null;
 
     modeSwitch.addEventListener("change", () => {
       const newMode = modeSwitch.checked ? "auto" : "manual";
       db.ref("/command/type").set(newMode);
       db.ref("/command/act").set(true);
-      db.ref("/request").set(false);
+      // db.ref("/request").set(false); // 불필요하다고 판단되어 주석 처리
     });
 
     pumpSwitch.addEventListener("change", (e) => {
@@ -239,104 +248,148 @@
       const newState = pumpSwitch.checked;
       db.ref("/command/state").set(newState);
       db.ref("/command/act").set(true);
-      db.ref("/request").set(false);
+      // db.ref("/request").set(false); // 불필요하다고 판단되어 주석 처리
     });
 
+    // 펌프 상태 및 모드 정보를 읽어와 UI 업데이트
     function updatePumpInfo() {
       db.ref("/esp/state").once("value").then(snap => {
         const state = snap.val();
         document.getElementById("pumpStatus").textContent = state ? "ON" : "OFF";
-        pumpSwitch.checked = !!state;
         pumpStatusText.textContent = state ? "펌프 ON" : "펌프 OFF";
+        pumpSwitch.checked = state;
+      }).catch(() => {
+        document.getElementById("pumpStatus").textContent = "-";
+        pumpStatusText.textContent = "-";
       });
 
       db.ref("/esp/type").once("value").then(snap => {
-        const mode = snap.val();
-        currentMode = mode;
-        document.getElementById("pumpType").textContent = mode === "auto" ? "자동" : "수동";
-        modeSwitch.checked = mode === "auto";
-        modeStatusText.textContent = mode === "auto" ? "자동 모드" : "수동 모드";
+        const type = snap.val();
+        document.getElementById("pumpType").textContent = type || "-";
+        currentMode = (type === "auto") ? "auto" : "manual";
+        modeStatusText.textContent = currentMode === "auto" ? "자동 모드" : "수동 모드";
+        modeSwitch.checked = currentMode === "auto";
+      }).catch(() => {
+        document.getElementById("pumpType").textContent = "-";
+        modeStatusText.textContent = "-";
       });
     }
 
+    // ESP 응답 시간 업데이트 및 상태 표시
     function updateESPStatus() {
-      if (!lastResponseTime || !window._nowKST) return;
+      db.ref("/response/time").once("value").then(snap => {
+        const timeStr = snap.val();
+        if (!timeStr) {
+          document.getElementById("lastTime").textContent = "-";
+          document.getElementById("espStatus").textContent = "응답 없음";
+          document.getElementById("espStatus").className = "status-fail";
+          return;
+        }
+        document.getElementById("lastTime").textContent = timeStr;
 
-      const diffSec = Math.abs((window._nowKST - lastResponseTime) / 1000);
-      const espStatus = document.getElementById("espStatus");
-      if (diffSec <= 30) {
-        espStatus.textContent = "ESP: 정상";
-        espStatus.className = "status-ok";
-      } else {
-        espStatus.textContent = "ESP: 이상";
-        espStatus.className = "status-fail";
-      }
+        const responseTime = new Date(timeStr.replace(" ", "T") + "+09:00").getTime();
+        const now = window._nowKST ? window._nowKST.getTime() : Date.now() + 9 * 3600000;
+
+        if (lastResponseTime === null || prevResponseTime === null) {
+          lastResponseTime = responseTime;
+          prevResponseTime = responseTime;
+        } else {
+          prevResponseTime = lastResponseTime;
+          lastResponseTime = responseTime;
+        }
+
+        const diffSec = Math.floor((now - responseTime) / 1000);
+        document.getElementById("diffSec").textContent = diffSec >= 0 ? diffSec : "-";
+
+        if (diffSec > 12) {
+          document.getElementById("espStatus").textContent = "ESP 연결 불안정";
+          document.getElementById("espStatus").className = "status-fail";
+        } else {
+          document.getElementById("espStatus").textContent = "ESP 정상 연결";
+          document.getElementById("espStatus").className = "status-ok";
+        }
+      }).catch(() => {
+        document.getElementById("lastTime").textContent = "-";
+        document.getElementById("espStatus").textContent = "응답 오류";
+        document.getElementById("espStatus").className = "status-fail";
+        document.getElementById("diffSec").textContent = "-";
+      });
     }
 
-    function initDashboard() {
-      db.ref("/response/temperature").on("value", snap => {
-        document.getElementById("temp").textContent = snap.val() ?? "-";
+    // 환경 센서 데이터 업데이트
+    function updateSensorData() {
+      db.ref("/sensor/temperature").once("value").then(snap => {
+        document.getElementById("temp").textContent = snap.val() !== null ? snap.val() : "-";
       });
-      db.ref("/response/humidity").on("value", snap => {
-        document.getElementById("humi").textContent = snap.val() ?? "-";
+      db.ref("/sensor/humidity").once("value").then(snap => {
+        document.getElementById("humi").textContent = snap.val() !== null ? snap.val() : "-";
       });
-      db.ref("/response/moisture").on("value", snap => {
-        document.getElementById("soil").textContent = snap.val() ?? "-";
+      db.ref("/sensor/moisture").once("value").then(snap => {
+        document.getElementById("soil").textContent = snap.val() !== null ? snap.val() : "-";
       });
+    }
 
-      db.ref("/response/ontime").on("value", snap => {
+    // 펌프 ON/OFF 시간 업데이트
+    function updatePumpTimes() {
+      db.ref("/response/ontime").once("value").then(snap => {
         document.getElementById("ontime").textContent = snap.val() || "-";
-        window._ontime = snap.val() ? new Date(snap.val().replace(" ", "T") + "+09:00") : null;
-        updateRuntime();
       });
-      db.ref("/response/offtime").on("value", snap => {
+      db.ref("/response/offtime").once("value").then(snap => {
         document.getElementById("offtime").textContent = snap.val() || "-";
-        window._offtime = snap.val() ? new Date(snap.val().replace(" ", "T") + "+09:00") : null;
-        updateRuntime();
       });
-
-      db.ref("/response/last_time").on("value", snap => {
-        document.getElementById("lastTime").textContent = snap.val() || "-";
-        lastResponseTime = snap.val() ? new Date(snap.val().replace(" ", "T") + "+09:00") : null;
-        updateRuntime();
-      });
-
-      setInterval(() => {
-        db.ref("/request").set(true);
-        updatePumpInfo();
-        updateESPStatus();
-        document.getElementById("connectionStatus").textContent = "FireBase: 정상";
-        document.getElementById("connectionStatus").className = "status-ok";
-      }, 10000);
-
-      updatePumpInfo();
     }
 
+    // 펌프 작동 시간 계산
     function updateRuntime() {
-      const runtimeElem = document.getElementById("pumpRuntime");
-      if (!window._ontime || !window._offtime) {
-        runtimeElem.textContent = "-";
+      const onStr = document.getElementById("ontime").textContent;
+      const offStr = document.getElementById("offtime").textContent;
+      if (onStr === "-" || offStr === "-") {
+        document.getElementById("pumpRuntime").textContent = "-";
         return;
       }
-
-      let runtimeSec = 0;
-      const on = window._ontime.getTime();
-      const off = window._offtime.getTime();
-
-      if (on && off) {
-        if (on > off) {
-          // 펌프가 현재 작동 중인 경우
-          runtimeSec = Math.floor((window._nowKST - window._ontime) / 1000);
-        } else {
-          // 마지막 작동 시간 기준으로 종료된 상태
-          runtimeSec = Math.floor((window._offtime - window._ontime) / 1000);
-        }
-        runtimeElem.textContent = runtimeSec >= 0 ? runtimeSec : 0;
-      } else {
-        runtimeElem.textContent = "-";
+      try {
+        const onTime = new Date(onStr.replace(" ", "T") + "+09:00").getTime();
+        const offTime = new Date(offStr.replace(" ", "T") + "+09:00").getTime();
+        const runtimeSec = Math.floor((offTime - onTime) / 1000);
+        document.getElementById("pumpRuntime").textContent = runtimeSec > 0 ? runtimeSec : 0;
+      } catch {
+        document.getElementById("pumpRuntime").textContent = "-";
       }
     }
 
+    // Firebase 정상 연결 확인
+    function updateFirebaseStatus() {
+      // Firebase 연결이 정상적이면 연결 상태 갱신 가능
+      if (firebase.apps.length > 0) {
+        document.getElementById("connectionStatus").textContent = "FireBase 정상 연결";
+        document.getElementById("connectionStatus").className = "status-ok";
+      } else {
+        document.getElementById("connectionStatus").textContent = "FireBase 연결 실패";
+        document.getElementById("connectionStatus").className = "status-fail";
+      }
+    }
+
+    // 10초마다 ESP에 요청 보내고 상태 갱신
+    setInterval(() => {
+      db.ref("/request").set(true);
+      updatePumpInfo();
+      updateESPStatus();
+      updateSensorData();
+      updatePumpTimes();
+      updateRuntime();
+      updateFirebaseStatus();
+    }, 10000);
+
+    // 초기 대시보드 데이터 업데이트
+    function initDashboard() {
+      updatePumpInfo();
+      updateESPStatus();
+      updateSensorData();
+      updatePumpTimes();
+      updateRuntime();
+      updateFirebaseStatus();
+    }
   </script>
 </body>
 </html>
+
