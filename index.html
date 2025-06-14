@@ -295,9 +295,9 @@
       });
 
       db.ref("/response/last_time").on("value", snap => {
-        const val = snap.val();
-        document.getElementById("lastTime").textContent = val || "-";
-        lastResponseTime = val ? new Date(val.replace(" ", "T") + "+09:00") : null;
+        document.getElementById("lastTime").textContent = snap.val() || "-";
+        lastResponseTime = snap.val() ? new Date(snap.val().replace(" ", "T") + "+09:00") : null;
+        updateRuntime();
       });
 
       setInterval(() => {
@@ -313,16 +313,29 @@
 
     function updateRuntime() {
       const runtimeElem = document.getElementById("pumpRuntime");
-      if (!window._ontime) {
+      if (!window._ontime || !window._offtime) {
         runtimeElem.textContent = "-";
         return;
       }
 
-      let endTime = window._offtime || window._nowKST;
-      let diffSec = Math.floor((endTime - window._ontime) / 1000);
-      if (diffSec < 0) diffSec = 0;
-      runtimeElem.textContent = diffSec;
+      let runtimeSec = 0;
+      const on = window._ontime.getTime();
+      const off = window._offtime.getTime();
+
+      if (on && off) {
+        if (on > off) {
+          // 펌프가 현재 작동 중인 경우
+          runtimeSec = Math.floor((window._nowKST - window._ontime) / 1000);
+        } else {
+          // 마지막 작동 시간 기준으로 종료된 상태
+          runtimeSec = Math.floor((window._offtime - window._ontime) / 1000);
+        }
+        runtimeElem.textContent = runtimeSec >= 0 ? runtimeSec : 0;
+      } else {
+        runtimeElem.textContent = "-";
+      }
     }
+
   </script>
 </body>
 </html>
