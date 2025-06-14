@@ -298,7 +298,7 @@
           lastResponseTime = responseTime;
         }
 
-        const diffSec = Math.floor((now - responseTime) / 1000);
+        const diffSec = Math.floor((lastResponseTime - prevResponseTime) / 1000);
         document.getElementById("diffSec").textContent = diffSec >= 0 ? diffSec : "-";
 
         if (diffSec > 20) {
