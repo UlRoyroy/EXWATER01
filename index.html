@@ -312,14 +312,17 @@
     }
 
     function updateRuntime() {
-      if (window._ontime && window._offtime) {
-        const sec = Math.floor((window._offtime - window._ontime) / 1000);
-        document.getElementById("pumpRuntime").textContent = sec > 0 ? sec : "-";
-      } else {
-        document.getElementById("pumpRuntime").textContent = "-";
+      const runtimeElem = document.getElementById("pumpRuntime");
+      if (!window._ontime) {
+        runtimeElem.textContent = "-";
+        return;
       }
+
+      let endTime = window._offtime || window._nowKST;
+      let diffSec = Math.floor((endTime - window._ontime) / 1000);
+      if (diffSec < 0) diffSec = 0;
+      runtimeElem.textContent = diffSec;
     }
   </script>
 </body>
 </html>
-
