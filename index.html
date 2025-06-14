@@ -235,7 +235,7 @@
       const newMode = modeSwitch.checked ? "auto" : "manual";
       db.ref("/command/type").set(newMode);
       db.ref("/command/act").set(true);
-      db.ref("/request").set(false); // 불필요하다고 판단되어 주석 처리
+      db.ref("/request").set(false);
     });
 
     pumpSwitch.addEventListener("change", (e) => {
@@ -248,7 +248,7 @@
       const newState = pumpSwitch.checked;
       db.ref("/command/state").set(newState);
       db.ref("/command/act").set(true);
-      db.ref("/request").set(false); // 불필요하다고 판단되어 주석 처리
+      db.ref("/request").set(false);
     });
 
     // 펌프 상태 및 모드 정보를 읽어와 UI 업데이트
@@ -301,7 +301,7 @@
         const diffSec = Math.floor((lastResponseTime - prevResponseTime) / 1000);
         document.getElementById("diffSec").textContent = diffSec >= 0 ? diffSec : "-";
 
-        if (diffSec > 20) {
+        if (diffSec > 30) {
           document.getElementById("espStatus").textContent = "ESP 연결 불안정";
           document.getElementById("espStatus").className = "status-fail";
         } else {
