@@ -173,8 +173,8 @@
     // KST 현재 시간 업데이트
     function updateTime() {
       const now = new Date();
-      now.setHours(now.getHours() + 9);
-      document.getElementById("currentTime").textContent = `현재 시각 (KST): ${now.toISOString().slice(0, 19).replace('T', ' ')}`;
+      document.getElementById("currentTime").textContent =
+        `현재 시각 (KST): ${now.toISOString().slice(0, 19).replace('T', ' ')}`;
       window._nowKST = now;
     }
     setInterval(updateTime, 1000);
@@ -231,7 +231,18 @@
     let lastResponseTime = null;
     let prevResponseTime = null;
 
+    function isOperationAllowed() {
+      const now = window._nowKST || new Date();
+      const hour = now.getHours();
+      return hour >= 5 && hour < 21;
+    }
+    
     modeSwitch.addEventListener("change", () => {
+      if (!isOperationAllowed()) {
+        alert("작동 가능 시간이 아닙니다. (매일 05시~21시만 작동 가능)");
+        modeSwitch.checked = currentMode === "auto";
+        return;
+      }
       const newMode = modeSwitch.checked ? "auto" : "manual";
       db.ref("/command/type").set(newMode);
       db.ref("/command/act").set(true);
@@ -239,6 +250,11 @@
     });
 
     pumpSwitch.addEventListener("change", (e) => {
+      if (!isOperationAllowed()) {
+        alert("작동 가능 시간이 아닙니다. (매일 05시~21시만 작동 가능)");
+        pumpSwitch.checked = !pumpSwitch.checked;
+        return;
+      }
       if (currentMode === "auto") {
         e.preventDefault();
         pumpSwitch.checked = !pumpSwitch.checked;
@@ -250,7 +266,7 @@
       db.ref("/command/act").set(true);
       db.ref("/request").set(false);
     });
-
+    
     // 펌프 상태 및 모드 정보를 읽어와 UI 업데이트
     function updatePumpInfo() {
       db.ref("/esp/state").once("value").then(snap => {
@@ -369,17 +385,6 @@
       }
     }
 
-    // 10초마다 ESP에 요청 보내고 상태 갱신
-    setInterval(() => {
-      db.ref("/request").set(true);
-      updatePumpInfo();
-      updateESPStatus();
-      updateSensorData();
-      updatePumpTimes();
-      updateRuntime();
-      updateFirebaseStatus();
-    }, 10000);
-
     // 초기 대시보드 데이터 업데이트
     function initDashboard() {
       updatePumpInfo();
@@ -390,45 +395,16 @@
       updateFirebaseStatus();
     }
 
-    // 현재 시간이 작동 허용 시간(05~21시)인지 확인
-function isOperationAllowed() {
-  const now = window._nowKST; // KST 기준
-  const hour = now.getHours();
-  return hour >= 5 && hour < 21;
-  }
-
-// 모드 스위치 클릭 시 차단 여부 확인
-modeSwitch.addEventListener("change", () => {
-  if (!isOperationAllowed()) {
-    alert("작동 가능 시간이 아닙니다. (매일 05시~21시만 작동 가능)");
-    modeSwitch.checked = currentMode === "auto"; // 원래 상태로 되돌림
-    return;
-  }
-  const newMode = modeSwitch.checked ? "auto" : "manual";
-  db.ref("/command/type").set(newMode);
-  db.ref("/command/act").set(true);
-  db.ref("/request").set(false);
-});
-
-// 펌프 스위치 클릭 시 차단 여부 확인
-pumpSwitch.addEventListener("change", (e) => {
-  if (!isOperationAllowed()) {
-    alert("작동 가능 시간이 아닙니다. (매일 05시~21시만 작동 가능)");
-    pumpSwitch.checked = !pumpSwitch.checked; // 상태 복원
-    return;
-  }
-  if (currentMode === "auto") {
-    e.preventDefault();
-    pumpSwitch.checked = !pumpSwitch.checked;
-    alert("자동 모드에서는 펌프 상태를 수동으로 변경할 수 없습니다.");
-    return;
-  }
-  const newState = pumpSwitch.checked;
-  db.ref("/command/state").set(newState);
-  db.ref("/command/act").set(true);
-  db.ref("/request").set(false);
-});
-
+    // 10초마다 ESP에 요청 보내고 상태 갱신
+    setInterval(() => {
+      db.ref("/request").set(true);
+      updatePumpInfo();
+      updateESPStatus();
+      updateSensorData();
+      updatePumpTimes();
+      updateRuntime();
+      updateFirebaseStatus();
+    }, 10000);
   </script>
 </body>
 </html>
