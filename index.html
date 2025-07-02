@@ -233,7 +233,7 @@
 
     function isOperationAllowed() {
       const now = window._nowKST || new Date();
-      const hour = now.getHours()+9;
+      const hour = (now.getHours() + 9) % 24;
       return hour >= 5 && hour < 21;
     }
     
