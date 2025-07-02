@@ -173,8 +173,8 @@
     // KST 현재 시간 업데이트
     function updateTime() {
       const now = new Date();
-      document.getElementById("currentTime").textContent =
-        `현재 시각 (KST): ${now.toISOString().slice(0, 19).replace('T', ' ')}`;
+      now.setHours(now.getHours() + 9);
+      document.getElementById("currentTime").textContent = `현재 시각 (KST): ${now.toISOString().slice(0, 19).replace('T', ' ')}`;
       window._nowKST = now;
     }
     setInterval(updateTime, 1000);
