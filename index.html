@@ -233,7 +233,8 @@
     function isOperationAllowed() {
       const now = new Date();
       const hour = (now.getHours() + 9) % 24;
-      document.getElementById("allowTime").textContent = `현재 시각 (KST): ${now.toISOString().slice(0, 19).replace('T', ' ')}`;
+      now.setHours(now.getHours() + 9);
+      document.getElementById("allowTime").textContent = `가능 시각 (KST): ${now.toISOString().slice(0, 19).replace('T', ' ')}`;
       return hour >= 5 && hour < 21;
     }
     
