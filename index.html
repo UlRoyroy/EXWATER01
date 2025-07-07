@@ -110,6 +110,7 @@
   <div class="center-container">
     <h1>EX 스마트 관수 시스템</h1>
     <p id="currentTime">현재 시각 (KST): -</p>
+    <p id="allowTime">현재 시각 (KST): -</p>
 
     <div id="loginForm">
       <input type="email" id="email" placeholder="이메일" required><br>
@@ -125,7 +126,8 @@
         <p>OFF 시간: <span id="offtime">-</span></p>
         <p>마지막 응답 시각: <span id="lastTime">-</span></p>
         <p>작동 시간: <span id="pumpRuntime">-</span> 초 | 차이 시각: <span id="diffSec">-</span></p>
-        <p id="connectionStatus" class="status-fail">FireBase: 확인 중... | <p id="espStatus" class="status-fail">ESP: 확인 중...</p>
+        <p id="connectionStatus" class="status-fail">FireBase: 확인 중... </p>
+        <p id="espStatus" class="status-fail">ESP: 확인 중...</p>
 
         <div class="switch-row">
           <div class="switch-container">
@@ -231,6 +233,7 @@
     function isOperationAllowed() {
       const now = new Date();
       const hour = (now.getHours() + 9) % 24;
+      document.getElementById("allowTime").textContent = `현재 시각 (KST): ${now.toISOString().slice(0, 19).replace('T', ' ')}`;
       return hour >= 5 && hour < 21;
     }
     
