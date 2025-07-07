@@ -110,7 +110,6 @@
   <div class="center-container">
     <h1>EX 스마트 관수 시스템</h1>
     <p id="currentTime">현재 시각 (KST): -</p>
-    <p id="allowTime">가능 시각 (KST): -</p>
 
     <div id="loginForm">
       <input type="email" id="email" placeholder="이메일" required><br>
@@ -232,9 +231,7 @@
 
     function isOperationAllowed() {
       const now = new Date();
-      const hour = (now.getHours() + 9) % 24;
-      now.setHours(now.getHours() + 9);
-      document.getElementById("allowTime").textContent = `가능 시각 (KST): ${now.toISOString().slice(0, 19).replace('T', ' ')}`;
+      const hour = now.getHours();
       return hour >= 5 && hour < 21;
     }
     
