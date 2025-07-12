@@ -232,12 +232,12 @@
     function isOperationAllowed() {
       const now = new Date();
       const hour = now.getHours();
-      return hour >= 5 && hour < 21;
+      return hour >= 0 && hour < 24;
     }
     
     modeSwitch.addEventListener("change", () => {
       if (!isOperationAllowed()) {
-        alert("작동 가능 시간이 아닙니다. (매일 05시~21시만 작동 가능)");
+        alert("작동 가능 시간이 아닙니다. (매일 00시~24시만 작동 가능)");
         modeSwitch.checked = currentMode === "auto";
         return;
       }
@@ -249,7 +249,7 @@
 
     pumpSwitch.addEventListener("change", (e) => {
       if (!isOperationAllowed()) {
-        alert("작동 가능 시간이 아닙니다. (매일 05시~21시만 작동 가능)");
+        alert("작동 가능 시간이 아닙니다. (매일 00시~24시만 작동 가능)");
         pumpSwitch.checked = !pumpSwitch.checked;
         return;
       }
